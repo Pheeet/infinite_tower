@@ -1117,7 +1117,7 @@ var lb = null;   // lobby scene state (independent of the battle's st)
 function lbZones(w, h) {
   return {
     tower: { x: w * 0.50, y: h * 0.300, lab: 'THE TOWER' },
-    fire:  { x: w * 0.50, y: h * 0.700, lab: 'THE FIRE' },
+    fire:  { x: w * 0.50, y: h * 0.660, lab: 'THE FIRE' },
     rest:  { x: w * 0.78, y: h * 0.830, lab: 'REST' },
     train: { x: w * 0.24, y: h * 0.830, lab: 'TRAINING' },
     work:  { x: w * 0.81, y: h * 0.510, lab: 'WORKSHOP' },
@@ -1441,7 +1441,7 @@ function lbFrame(now) {
 
     /* ---- V0.27 MORNING: dawn gold behind the Tower ---- */
     var bg = ctx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, '#66788e'); bg.addColorStop(0.3, '#8e8e94');
+    bg.addColorStop(0, '#7a8ba0'); bg.addColorStop(0.3, '#a09a96');
     bg.addColorStop(0.55, '#c4a67e'); bg.addColorStop(0.8, '#dcb87e'); bg.addColorStop(1, '#b89a6e');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
     /* the low sun, rising behind the Tower's shoulder */
@@ -1687,7 +1687,7 @@ function lbFrame(now) {
             var slotX = fx + (party.indexOf(hero) - (party.length - 1) / 2) * 64;
             u = lb.units['u' + hero.id] = {
               id: hero.id, name: hero.name, inParty: true, pinned: true,
-              alpha: 1, sc: 4.6,
+              alpha: 1, sc: 5.5,
               sprs: { idle0: makeHeroSprite(hero.cls, hero.id, 'idle0', mk1),
                       idle1: makeHeroSprite(hero.cls, hero.id, 'idle1', mk1),
                       atk: makeHeroSprite(hero.cls, hero.id, 'atk', mk1) },
@@ -1699,7 +1699,7 @@ function lbFrame(now) {
             var sp0 = lbFindSpot(Z.fire.x, Z.fire.y, null);
             u = lb.units['u' + hero.id] = {
               id: hero.id, name: hero.name, inParty: false,
-              alpha: 0.55, sc: 3,        /* bench = peripheral */
+              alpha: 0.55, sc: 3.4,        /* bench = peripheral */
               sprs: { idle0: makeHeroSprite(hero.cls, hero.id, 'idle0', mk1),
                       idle1: makeHeroSprite(hero.cls, hero.id, 'idle1', mk1),
                       atk: makeHeroSprite(hero.cls, hero.id, 'atk', mk1) },
@@ -1754,7 +1754,7 @@ function lbFrame(now) {
       lg.setTransform(lb.dpr, 0, 0, lb.dpr, 0, 0);
       lg.globalCompositeOperation = 'source-over';
       lg.clearRect(0, 0, w, h);
-      lg.fillStyle = 'rgba(40,34,20,.10)';
+      lg.fillStyle = 'rgba(40,34,20,.06)';
       lg.fillRect(0, 0, w, h);
       lg.globalCompositeOperation = 'destination-out';
       var fireFl = 0.85 + 0.15 * Math.sin(t * 8.3);
@@ -1786,7 +1786,7 @@ function lbFrame(now) {
     }
     /* vignette */
     var vg = ctx.createRadialGradient(w / 2, h * 0.5, h * 0.4, w / 2, h * 0.5, h * 0.85);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,32,20,.20)');
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,32,20,.14)');
     ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
     if (lb.fade < 1) {
       lb.fade = Math.min(1, lb.fade + dt * 2);
