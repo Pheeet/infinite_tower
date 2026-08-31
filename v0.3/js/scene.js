@@ -196,9 +196,250 @@ function outlinePass(s) {
   g.putImageData(id, 0, 0);
 }
 
+/* ============================ V0.28 HERO SPRITES — hand-crafted grids ============================
+   Designed ON a 12x16 grid (not rectangles reduced to pixels): asymmetric
+   idle poses (lean, akimbo arms, uneven shoulders), weapons fused into the
+   silhouette, per-hero fringe variants + palette swaps for face identity,
+   and a DIRECTIONAL outline (shadow side only — light side stays open, so
+   the sprite reads drawn, not stickered). Rows are auto-padded, so the
+   authored grids never need exact-width counting.
+   chars: H hair · S skin · E eye · C cloth · c cloth-shade · A accent ·
+          M metal · m metal-shade · G gold · L leather/wood · B blade ·
+          b blade-shade · O orb (class color) · o orb-shade · W white      */
+var GRID_W = 12, GRID_H = 16;
+
+var HERO_GRIDS = {
+Warrior: {
+  idle: [
+    '....HHHH',
+    '...HHHHHH',
+    '...HSHSHS',
+    '...SESEES',
+    '...SSSSSS',
+    '....SSSS',
+    '..MCCCCAA',
+    '.MCCACCCC',
+    '.SCCCCGCC',
+    'S..CCCCC.LB',
+    '...CCCLC.LB',
+    '...CC.CC.LB',
+    '..CCL.CCLLB',
+    '..CC...CC',
+    '..LL...LL',
+    '.LLL..LLL'
+  ],
+  atk: [
+    '........bb',
+    '.......BBB',
+    '.....HHHHG',
+    '...HHHHHGG',
+    '...HSHSHS',
+    '...SESEES',
+    '...SSSSSS',
+    '....SSSS',
+    '..MCCCCAA',
+    '.MCCACCCC',
+    '.SCCCCGCC',
+    'S..CCCCC',
+    '...CCCLC',
+    '...CC.CC',
+    '..CCL.CCL',
+    '..LL...LL'
+  ]
+},
+Tank: {
+  idle: [
+    '....MMMM',
+    '...MMMMMM',
+    '...MEMEMM',
+    '....SSSS',
+    '....CCCCA',
+    'MMMCCCCCCm',
+    'MMMCCACCCm',
+    'MMMCCGCCCL',
+    'MMMCCCCCCL',
+    'MMMCCCCC.M',
+    'MMMCLCCCL',
+    'MMMCC.CCL',
+    'MMMC..CC',
+    '.MM...LL',
+    '.LL..LLL',
+    '..L...LL'
+  ],
+  atk: [
+    '.......MMm',
+    '....MMMM.Mm',
+    '...MMMMMML',
+    '...MEMEM.L',
+    '....SSSSL',
+    'MMMCCCCA',
+    'MMMCCACCCm',
+    'MMMCCGCCCL',
+    'MMMCCCCCCL',
+    'MMMCCCCCC',
+    'MMMCLCCCC',
+    'MMMCC.CC',
+    'MMMC..CC',
+    '.MM...LL',
+    '.LL..LLL',
+    '..L...LL'
+  ]
+},
+Rogue: {
+  idle: [
+    '....CCCC',
+    '...CCCCCC',
+    '...CSESEC',
+    '...CSSSSC',
+    '....SSSS',
+    '...CCCCAA',
+    '..CCACCCC',
+    '..SCCGCCC',
+    'S..CCCCC',
+    '...CCCC.LB',
+    '...CC.CCLB',
+    '...CC.CCLB',
+    '..CCL.CCL',
+    '..CC...CC',
+    '..LL...LL',
+    '.LLL..LLL'
+  ],
+  atk: [
+    '.........Bb',
+    '.........BB',
+    '....CCCC.L',
+    '...CCCCCCL',
+    '...CSESEC',
+    '...CSSSSC',
+    '....SSSS',
+    '...CCCCAA',
+    '..CCACCCC',
+    '..SCCGCCC',
+    'S..CCCCC',
+    '...CCCC',
+    '...CC.CC',
+    '..CCL.CCL',
+    '..LL...LL',
+    '.LLL..LLL'
+  ]
+},
+Mage: {
+  idle: [
+    '........Oo',
+    '.........OO',
+    '....CC...Oo',
+    '..CCCCCC.GG',
+    '...HSHSHS',
+    '...SESEES',
+    '...SSSSSS',
+    '....CCCCA',
+    '...CCCCCC',
+    '...CCGCCC.L',
+    '...CCCCCC.L',
+    '...CCCC.C.L',
+    '..CCL.CCL.L',
+    '..CC...CC.L',
+    '..LL...LL',
+    '.LLL..LLL'
+  ],
+  atk: [
+    '........WW',
+    '.......OOO',
+    '....CC..Oo',
+    '..CCCCCCGG',
+    '...HSHSHS',
+    '...SESEES',
+    '...SSSSSS',
+    '....CCCCA',
+    '...CCCCCC',
+    '...CCGCCC.LL',
+    '...CCCCCCLL',
+    '...CCCC.C.L',
+    '..CCL.CCL.L',
+    '..CC...CC',
+    '..LL...LL',
+    '.LLL..LLL'
+  ]
+},
+Healer: {
+  idle: [
+    '....HHHH',
+    '...HHHHHH',
+    '...GGGGGG',
+    '...HSHSHS',
+    '...SESEES',
+    '...SSSSSS',
+    '..H.SSSS.H',
+    '..HCCCCA.H',
+    '..HCAAAAA.H',
+    '..HCCCGCC.A',
+    '..HCCCCCC.L',
+    '..HCCCCC.L',
+    '..HCCC.CC.L',
+    '...CCL.CCL',
+    '...LL...LL',
+    '..LLL..LLL'
+  ],
+  atk: [
+    '.........AA',
+    '....HHHH.AA',
+    '...HHHHHHL',
+    '...GGGGGGL',
+    '...HSHSHS',
+    '...SESEES',
+    '...SSSSSS',
+    '..H.CCCCA',
+    '..HCCAAAAA',
+    '..HCCCGCC',
+    '..HCCCCCC',
+    '..HCCCCC',
+    '..HCCC.CC',
+    '...CCL.CCL',
+    '...LL...LL',
+    '..LLL..LLL'
+  ]
+}
+};
+
+/* per-hero fringe variants — the face's จุดจำ */
+function applyFringe(rows, v) {
+  var r = rows.slice();
+  if (v === 1) {            /* side-swept */
+    r[0] = '..HHHH';
+    r[1] = '..HHHHHH';
+  } else if (v === 2) {     /* hair over one eye */
+    r[2] = r[2].replace('SE', 'HE');
+    r[3] = r[3].replace('SE', 'HE');
+  }
+  return r;
+}
+
+/* directional outline: dark rim on the SHADOW side only (neighbors above
+   and to the LEFT are the light side and stay open) */
+function outlineDarkSide(s) {
+  var g = s.g, w0 = s.w, h0 = s.h, id;
+  try { id = g.getImageData(0, 0, w0, h0); } catch (e) { return; }
+  var d = id.data, x, y, i;
+  var NV = [18, 22, 30];
+  for (y = 0; y < h0; y++) {
+    for (x = 0; x < w0; x++) {
+      i = (y * w0 + x) * 4;
+      if (d[i + 3] > 40) continue;
+      /* shadow rim: opaque neighbor BELOW or RIGHT (light from top-left) */
+      var nb = null;
+      if (y < h0 - 1 && d[i + w0 * 4 + 3] > 40) nb = i + w0 * 4;
+      else if (x < w0 - 1 && d[i + 4 + 3] > 40) nb = i + 4;
+      if (nb == null) continue;
+      var r = Math.round((d[nb] * 0.34) * 0.8 + NV[0] * 0.2);
+      var gg = Math.round((d[nb + 1] * 0.34) * 0.8 + NV[1] * 0.2);
+      var b = Math.round((d[nb + 2] * 0.34) * 0.8 + NV[2] * 0.2);
+      d[i] = r; d[i + 1] = gg; d[i + 2] = b; d[i + 3] = 255;
+    }
+  }
+  g.putImageData(id, 0, 0);
+}
+
 function makeHeroSprite(cls, id, pose, marks) {
-  /* v0.27: foe-level simplicity — one head block, one body block, one weapon.
-     Identity = color + silhouette piece, like the monsters. 12x16. */
   pose = pose || 'idle0';
   var rng = mulberry((id | 0) * 7919 + 13);
   var skin = SKINS[Math.floor(rng() * SKINS.length)];
@@ -206,76 +447,47 @@ function makeHeroSprite(cls, id, pose, marks) {
   var VIVID = { Warrior: '#d24a33', Tank: '#3f6ea8', Rogue: '#2f9153',
                 Mage: '#8a4fc0', Healer: '#2fb9c9' };
   var cloth = shade(VIVID[cls] || '#8a93a8', 0.1 + (rng() - 0.5) * 0.12);
-  var cd = shade(cloth, -0.3);
-  var MET = ['#a8b2c2', '#6d7686'], GOLD = '#e8b04b';
-  var s = sprCanvas(12, 16), g = s.g;
-  var dy = (pose === 'idle1') ? 1 : 0;
-  var atk = (pose === 'atk');
-  var eyes = function (y) { R(g, 4, y + dy, 1, 1, '#1a1d26'); R(g, 7, y + dy, 1, 1, '#1a1d26'); };
+  var fringeV = Math.floor(rng() * 3);
 
-  function head(hatCol) {
-    R(g, 3, 0 + dy, 6, 2, hatCol || hair);
-    R(g, 3, 2 + dy, 6, 3, skin);
-    eyes(3);
-  }
-  function legs() {
-    R(g, 3, 11, 2, 3, cd); R(g, 7, 11, 2, 3, cd);
-    R(g, 3, 14, 2, 1, '#2c313c'); R(g, 7, 14, 2, 1, '#2c313c');
-  }
+  var pal = {
+    H: hair, S: skin, E: '#20242e',
+    C: cloth, c: shade(cloth, -0.32), A: '#f2e8d0',
+    M: '#9aa5b5', m: '#6d7686', G: '#e8b04b',
+    L: '#6b4a2b', B: '#dde3ec', b: '#a9b2c2',
+    O: shade(VIVID[cls] || '#8a93a8', 0.35), o: shade(VIVID[cls] || '#8a93a8', -0.1),
+    W: '#ffffff'
+  };
 
-  if (cls === 'Warrior') {
-    R(g, 2, 6 + dy, 8, 5, cloth); R(g, 2, 6 + dy, 8, 1, shade(cloth, 0.25));
-    R(g, 2, 10 + dy, 8, 1, cd);
-    head(MET[0]);
-    R(g, 2, 5 + dy, 8, 1, MET[1]);
-    legs();
-    R(g, atk ? 10 : 10, atk ? 1 : 3, 1, atk ? 9 : 8, '#d8dde8');
-    R(g, 9, atk ? 9 : 9, 3, 1, GOLD);
-  } else if (cls === 'Tank') {
-    R(g, 2, 6 + dy, 8, 5, cloth); R(g, 2, 6 + dy, 8, 1, shade(cloth, 0.25));
-    head(MET[0]);
-    R(g, 2, 0 + dy, 8, 2, MET[0]);
-    R(g, 3, 2 + dy, 6, 1, '#12151c');
-    legs();
-    R(g, atk ? 1 : 0, atk ? 4 : 5, 3, atk ? 8 : 9, MET[0]);
-    R(g, atk ? 1 : 0, atk ? 4 : 5, 3, 1, '#d5dae2');
-  } else if (cls === 'Rogue') {
-    R(g, 2, 6 + dy, 8, 5, cloth); R(g, 2, 6 + dy, 8, 1, shade(cloth, 0.25));
-    head(cloth);
-    R(g, 2, 2 + dy, 1, 2, cloth); R(g, 9, 2 + dy, 1, 2, cloth);
-    legs();
-    R(g, 10, atk ? 2 : 7, 1, 5, '#d8dde8');
-  } else if (cls === 'Mage') {
-    R(g, 2, 6 + dy, 8, 6, cloth);                      // robe
-    R(g, 2, 11 + dy, 8, 1, cd);
-    head(cloth);
-    R(g, 5, 0 + dy, 2, 1, cloth); R(g, 4, 1 + dy, 4, 1, cloth);  // hat tip
-    R(g, 1, 2 + dy, 10, 1, cd);                        // brim
-    R(g, 4, 13 + dy, 4, 1, '#2c313c');
-    R(g, 10, atk ? 1 : 3, 1, 12, '#6b4a2b');
-    R(g, 9, 0 + dy, 3, 2, VIVID.Mage);
-    R(g, 10, 0 + dy, 1, 1, atk ? '#ffffff' : '#d0b0f5');
-  } else {   // Healer
-    R(g, 2, 6 + dy, 8, 6, cloth);
-    R(g, 5, 6 + dy, 2, 5, '#f2e8d0');                  // stole
-    head(hair);
-    R(g, 3, 2 + dy, 6, 1, GOLD);                       // circlet
-    R(g, 4, 13 + dy, 4, 1, '#2c313c');
-    R(g, 10, atk ? 2 : 3, 1, 11, '#6b4a2b');
-    R(g, 9, atk ? 0 : 1, 3, 2, VIVID.Healer);
-    R(g, 10, atk ? 0 : 1, 1, 1, '#ffffff');
+  var base = HERO_GRIDS[cls] || HERO_GRIDS.Warrior;
+  var rows = applyFringe(base[pose === 'atk' ? 'atk' : 'idle'], (cls === 'Tank' || cls === 'Rogue') ? 0 : fringeV);
+  var dy = (pose === 'idle1') ? 1 : 0;   /* breathe: head block sinks, feet stay */
+
+  var s = sprCanvas(GRID_W, GRID_H), g = s.g;
+  for (var y = 0; y < GRID_H; y++) {
+    var row = (rows[y] || '').padEnd(GRID_W, '.').slice(0, GRID_W);
+    for (var x = 0; x < GRID_W; x++) {
+      var ch = row.charAt(x);
+      if (ch === '.' || !pal[ch]) continue;
+      var yy = (y <= 6 && dy) ? y + 1 : y;   /* rows 0-6 = head block */
+      if (yy >= GRID_H) continue;
+      g.fillStyle = pal[ch];
+      g.fillRect(x, yy, 1, 1);
+    }
   }
 
+  /* marks — legacy scar on the cheek, pact = both eyes burn, gold brand */
   if (marks) {
-    if (marks.legacy) R(g, 9, 3 + dy, 1, 2, '#9a6a5a');
-    if (marks.pact) { R(g, 4, 3 + dy, 1, 1, '#e05263'); R(g, 7, 3 + dy, 1, 1, '#e05263'); }
-    if (marks.brand) R(g, 5, 1 + dy, 2, 1, GOLD);
+    if (marks.legacy) { g.fillStyle = '#9a6a5a'; g.fillRect(8, 4, 1, 2); }
+    if (marks.pact) {
+      g.fillStyle = '#5e1620'; g.fillRect(3, 3, 6, 1);
+      g.fillStyle = '#e05263'; g.fillRect(4, 3, 1, 1); g.fillRect(7, 3, 1, 1);
+    }
+    if (marks.brand) { g.fillStyle = '#e8b04b'; g.fillRect(5, 1, 2, 1); }
   }
 
-  outlinePass(s);
+  outlineDarkSide(s);
   return s;
 }
-
 
 /* ============================ FOE SPRITES ============================ */
 function foeKind(name) {
