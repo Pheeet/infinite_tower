@@ -1732,7 +1732,7 @@ RENDER.expedition=function(app,arg){
   /* the route map itself (horizontal, interactive) */
   var box=UI.el('map-box');
   var rl=mod('map','relayout');
-  if(rl && !ex.map.grid){ try{ rl.call(IT.map,ex.map); }catch(e){} }
+  if(rl && ex.map.grid!==2){ try{ rl.call(IT.map,ex.map); }catch(e){} }   /* v2 = lanes 20/50/80 */
   var r=mod('map','render');
   if(r&&box){
     try{ r.call(IT.map,ex.map,box,function(nodeId){ IT.flow.enterNode(nodeId); }); }

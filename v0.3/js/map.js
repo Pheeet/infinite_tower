@@ -147,7 +147,7 @@ window.IT.map = window.IT.map || {};
       if (pool.length) pool[pool.length - 1].type = 'remains';
     })();
 
-    return { floor: floor, nodes: nodes, edges: edges, startId: start.id, endId: end.id, grid: 1 };
+    return { floor: floor, nodes: nodes, edges: edges, startId: start.id, endId: end.id, grid: 2 };   /* grid v2: lanes 20/50/80 */
   }
 
   /* V0.30b: relayout(map) — snap an already-generated (or old saved) map
@@ -186,7 +186,7 @@ window.IT.map = window.IT.map || {};
       n.x = Math.round(22 + (d - 1) * step);
       n.y = col.length <= 3 ? LANES[Math.min(2, col.length - 1)][Math.min(col.indexOf(n), col.length - 1)] : 50;
     });
-    map.grid = 1;
+    map.grid = 2;
   }
 
   /* ============================ SCOUT / REACHABLE ============================ */
