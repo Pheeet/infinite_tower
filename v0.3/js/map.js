@@ -53,7 +53,7 @@ window.IT.map = window.IT.map || {};
   // flanks. No jitter: nodes NEVER overlap, the route reads balanced.
   function rowY(count) {
     if (count < 2) return [50];
-    return [26, 74];
+    return [20, 80];
   }
 
   /* gen(floor) → MapObj.
@@ -84,13 +84,13 @@ window.IT.map = window.IT.map || {};
     var rowIds = [];
     var id = 0;
 
-    var start = mkNode('n' + (id++), 'start', 8, 50, 1);
+    var start = mkNode('n' + (id++), 'start', 5, 50, 1);
     start.scouted = true; // you know where you stand
     nodes.push(start);
 
-    var step = (84 - 24) / (rows - 1);
+    var step = (78 - 22) / (rows - 1);
     for (r = 0; r < rows; r++) {
-      var x = Math.round(24 + r * step);      // progression → right, grid columns
+      var x = Math.round(22 + r * step);      // progression → right, grid columns
       var ys = rowY(counts[r]);               // grid lanes: 26 / 50 / 74
       var ids = [];
       for (i = 0; i < counts[r]; i++) {
@@ -104,7 +104,7 @@ window.IT.map = window.IT.map || {};
 
     var bossFloor = (floor === 10 || floor === 20);
     var endType = bossFloor ? 'boss' : 'combat';
-    var end = mkNode('n' + (id++), endType, 93, 50, bossFloor ? 5 : threatFor(floor, 1));
+    var end = mkNode('n' + (id++), endType, 95, 50, bossFloor ? 5 : threatFor(floor, 1));
     end.scouted = true; // the exit is no secret — only mid rooms hide their nature
     nodes.push(end);
 
@@ -176,14 +176,14 @@ window.IT.map = window.IT.map || {};
       maxD = Math.max(maxD, depth[n.id]);
       (byDepth[depth[n.id]] = byDepth[depth[n.id]] || []).push(n);
     });
-    var LANES = [[50], [26, 74], [26, 50, 74]];
-    var step = maxD > 1 ? (84 - 24) / (maxD - 1) : 0;
+    var LANES = [[50], [20, 80], [20, 50, 80]];
+    var step = maxD > 1 ? (78 - 22) / (maxD - 1) : 0;
     map.nodes.forEach(function (n) {
       var d = depth[n.id];
-      if (n.id === map.startId) { n.x = 8; n.y = 50; return; }
-      if (n.id === map.endId) { n.x = 93; n.y = 50; return; }
+      if (n.id === map.startId) { n.x = 5; n.y = 50; return; }
+      if (n.id === map.endId) { n.x = 95; n.y = 50; return; }
       var col = byDepth[d];
-      n.x = Math.round(24 + (d - 1) * step);
+      n.x = Math.round(22 + (d - 1) * step);
       n.y = col.length <= 3 ? LANES[Math.min(2, col.length - 1)][Math.min(col.indexOf(n), col.length - 1)] : 50;
     });
     map.grid = 1;

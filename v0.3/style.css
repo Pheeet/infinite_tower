@@ -1444,9 +1444,9 @@ body{
 .route-frame #map-box{height:100%;min-height:0}
 /* the old climb-frame forced a 358px map — the route strip is short */
 .route-frame .it-mapwrap{min-height:0;height:100%;background:transparent;border:none;border-radius:0}
-.route-frame .mapnode{width:34px;height:34px}
-.route-frame .mapnode .ic{font-size:12px}
-.route-frame .mapnode .ic.unknown{font-size:13px}
+.route-frame .mapnode{width:28px;height:28px;border-width:2px}
+.route-frame .mapnode .ic{font-size:10px}
+.route-frame .mapnode .ic.unknown{font-size:11px}
 .route-frame .mapnode .stars{display:none}
 .exp-route .map-flavor{margin:1px 0 2px;font-size:9.5px}
 /* party 13% + actions 12% */
