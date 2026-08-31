@@ -2141,6 +2141,18 @@ function dungeonFrame(now) {
       var fy2 = wallB - 16 + fx2 * 14;
       ctx.beginPath(); ctx.moveTo(w * 0.10 - fx2 * 6, fy2); ctx.lineTo(w * 0.90 + fx2 * 6, fy2); ctx.stroke();
     }
+    /* V0.31: a worn inlay runs from under the party's feet to the door —
+       the room itself points at what's next */
+    ctx.fillStyle = 'rgba(120,124,120,.10)';
+    ctx.beginPath();
+    ctx.moveTo(cx - 30, wallB - 18);
+    ctx.lineTo(cx + 30, wallB - 18);
+    ctx.lineTo(cx + 78, h);
+    ctx.lineTo(cx - 78, h);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,150,140,.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx - 30, wallB - 18); ctx.lineTo(cx - 78, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 30, wallB - 18); ctx.lineTo(cx + 78, h); ctx.stroke();
 
     /* ---- the far end: what KIND of room is this? ---- */
     var cx = w / 2, cy = wallB - 24;
@@ -2194,6 +2206,18 @@ function dungeonFrame(now) {
       R(ctx, cx - 2, cy - 16, 4, 8, '#8b94a7');   // sword planted
       R(ctx, cx - 4, cy - 18, 8, 2, '#c9ccd6');
     }
+    /* the sigil over the gate: calm = cold ember, panic = bleeding red */
+    var sigC = (dn.dreadTier === 'panic') ? [224, 82, 99] :
+               (dn.dreadTier === 'dread') ? [224, 132, 59] : [95, 180, 210];
+    var sigA = 0.22 + 0.12 * Math.sin(t * 1.6);
+    ctx.strokeStyle = 'rgba(' + sigC[0] + ',' + sigC[1] + ',' + sigC[2] + ',' + sigA.toFixed(2) + ')';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, wallB - 86, 9, 0, 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, wallB - 86, 4, 0, 6.283); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 12, wallB - 86); ctx.lineTo(cx + 12, wallB - 86);
+    ctx.moveTo(cx, wallB - 98); ctx.lineTo(cx, wallB - 74);
+    ctx.stroke();
     torch(ctx, w * 0.13, wallB - 78, t, 0, dn.dreadTier === 'panic');
     torch(ctx, w * 0.87, wallB - 78, t, 1, dn.dreadTier === 'panic');
 
@@ -2221,6 +2245,10 @@ function dungeonFrame(now) {
         ctx.fillRect(cx - 14, cy - 38, 3, 2); ctx.fillRect(cx + 11, cy - 38, 3, 2);
       }
     }
+    /* faint drifting motes — the air itself is present */
+    if (Math.random() < 0.05) dn.parts.push({ x: Math.random() * w, y: wallB - 40,
+      vx: (Math.random() - 0.5) * 4, vy: -4 - Math.random() * 4,
+      life: 1, decay: 0.25, size: 1, color: 'rgba(170,180,190,.16)', soft: true });
     if (tier === 'panic') {
       /* dust sifting from the ceiling */
       if (Math.random() < 0.1) dn.parts.push({ x: Math.random() * w, y: wallB - 110,
@@ -2239,9 +2267,13 @@ function dungeonFrame(now) {
       }
       var bob = (u.mode === 'walk') ? Math.sin(t * 9 + i) * 2 : Math.sin(t * 2 + i) * 1.2;
       var spr = u.sprs[(u.mode === 'walk') ? ('idle' + (Math.floor(t * 6 + i) % 2)) : 'idle0'];
-      ctx.fillStyle = 'rgba(0,0,0,.4)';
-      ctx.beginPath(); ctx.ellipse(u.x, u.y + 30, 13, 4, 0, 0, 6.283); ctx.fill();
       var w0 = spr.w * 3.4, h0 = spr.h * 3.4;
+      /* V0.31: contact shadow AT the feet line — soft two-layer, the ground
+         holds them instead of them floating over a blob */
+      ctx.fillStyle = 'rgba(0,0,0,.16)';
+      ctx.beginPath(); ctx.ellipse(u.x, u.y + h0 / 2 + 1, w0 * 0.36, 3.5, 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.32)';
+      ctx.beginPath(); ctx.ellipse(u.x, u.y + h0 / 2 + 1, w0 * 0.22, 2.2, 0, 0, 6.283); ctx.fill();
       ctx.drawImage(spr.c, Math.round(u.x - w0 / 2), Math.round(u.y - h0 / 2 + bob), w0, h0);
       /* names + live condition over their heads */
       ctx.font = '6px ' + PIXEL; ctx.textAlign = 'center';
