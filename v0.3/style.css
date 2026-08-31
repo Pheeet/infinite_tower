@@ -1,0 +1,1462 @@
+/* ============================================================
+   INFINITE TOWER v0.3 — style.css
+   (AGENT-E foundations · v0.6 AGENT-H3 · v0.7 AGENT-H4 ·
+   V0.8 AGENT-FEEL-A "game feel": stone & candle art direction)
+
+   V0.8 retune (AGENT-FEEL-A owns this file's core; FEEL-B and
+   FEEL-C append scoped blocks at file end — comment headers):
+   - tokens retuned (names kept): deep bg #07080c, layered
+     radial-gradient stone/candle light, warm parchment surfaces,
+     thin gold hairlines instead of bordered boxes everywhere.
+   - type: Cinzel promoted (display, larger, letterspaced);
+     body face is now Alegreya (bookish serif). Log stays mono.
+   - hero presence: .hero-sprite shared figure system (arched
+     stone frame, 2.8s idle bob, .dead = desaturated head-bowed)
+     + .nameplate under the sprite.
+   - .screenbeat: every UI.go() fades through near-black 260ms
+     (0ms under prefers-reduced-motion).
+   - buttons: engraved stone/brass, ≥52px.
+   ============================================================ */
+
+:root{
+  --bg:#07080c; --card:#11141c; --card2:#171b26; --line:#272d3c;
+  --txt:#ded9cb; --dim:#8f8a7a; --gold:#e8b04b; --red:#e05263;
+  --green:#5fbf77; --blue:#5aa2e8;
+  /* V0.8: candle & stone */
+  --hair:rgba(232,176,75,.25);          /* thin gold hairline separator */
+  --hair-strong:rgba(232,176,75,.45);
+  --parchment:#181410;                   /* warm note surface */
+  --parchment-edge:#2c2415;
+  --ink:#cdb98a;                         /* engraved caption ink */
+  --stone-hi:#20263a; --stone-lo:#12151d;
+  /* class colors */
+  --cWarrior:#d98e3f; --cTank:#7f8fa6; --cRogue:#7ec97e; --cMage:#9b6ee8; --cHealer:#5fd4e0;
+  /* axis colors */
+  --axCourage:#e05263; --axGreed:#e8b04b; --axLoyalty:#5aa2e8; --axFear:#9b6ee8;
+  /* rarity colors */
+  --r1:#9aa3b2; --r2:#7ec97e; --r3:#5aa2e8; --r4:#e8b04b;
+  /* display faces */
+  --disp:Cinzel,Georgia,"Times New Roman",serif;
+  --body:Alegreya,Georgia,"Times New Roman",serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  color:var(--txt);
+  font:15.5px/1.6 var(--body);
+  max-width:430px;margin:0 auto;
+  min-height:100vh;
+  padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  /* layered candle/stone light over deep near-black — CSS only */
+  background:
+    radial-gradient(140% 62% at 50% -12%, rgba(64,52,28,.20) 0%, rgba(24,20,12,0) 58%),
+    radial-gradient(90% 42% at 88% 112%, rgba(46,24,26,.14) 0%, rgba(0,0,0,0) 62%),
+    radial-gradient(70% 38% at 6% 104%, rgba(24,28,44,.22) 0%, rgba(0,0,0,0) 58%),
+    radial-gradient(120% 120% at 50% 50%, #0a0c12 0%, #07080c 72%);
+  background-attachment:fixed;
+}
+
+/* ---------- header: carved lintel ---------- */
+#hdr{
+  position:sticky;top:0;z-index:40;
+  background:linear-gradient(180deg,#141824 0%,#0d101a 100%);
+  border-bottom:1px solid var(--hair);
+  box-shadow:0 1px 0 rgba(0,0,0,.55),0 6px 18px rgba(0,0,0,.35);
+  padding:10px 16px;
+  padding-top:calc(10px + env(safe-area-inset-top,0px));
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+}
+#hdr h1{font-size:15px;letter-spacing:.28em;font-family:var(--disp);font-weight:800;white-space:nowrap}
+#hdr h1 .ver{color:var(--gold);font-size:10px;letter-spacing:.12em;margin-left:6px;font-family:inherit}
+#hdr .hstats{display:flex;gap:12px;color:var(--dim);font-size:13px;white-space:nowrap}
+#hdr .hstats b{color:var(--txt);font-weight:700}
+#hdr.exped h1 .ver{color:var(--red)}
+
+/* ---------- nav: quiet tabs ---------- */
+#nav{
+  display:flex;gap:2px;
+  background:rgba(13,16,26,.72);
+  border-bottom:1px solid var(--hair);
+  padding:0 12px;
+}
+#nav.hidden{display:none}
+#nav button{
+  flex:1;min-height:46px;
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--dim);font-family:var(--disp);font-size:12px;font-weight:700;
+  letter-spacing:.18em;text-transform:uppercase;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+#nav button.on{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* ---------- app + screen beat ---------- */
+#app{padding:16px 16px 8px}
+.hidden{display:none!important}
+/* every UI.go(): the old screen fades through near-black, the new one
+   breathes in — 260ms, nothing under prefers-reduced-motion */
+#app.beat-in{animation:screenbeat .26s ease-out both}
+@keyframes screenbeat{
+  from{opacity:0}
+  to{opacity:1}
+}
+h2.scr{
+  display:flex;align-items:center;gap:10px;
+  font:700 11.5px var(--disp);color:var(--gold);letter-spacing:.3em;
+  text-transform:uppercase;margin:4px 0 14px;
+}
+h2.scr::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--hair-strong),transparent)}
+.hint{color:var(--dim);font-size:13px;margin:8px 0;font-style:italic}
+.hint b{color:var(--txt);font-style:normal}
+
+/* ---------- full-bleed title card (shared: floor / victory / defeat) ---------- */
+.titlecard{
+  position:fixed;inset:0;z-index:80;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:radial-gradient(80% 50% at 50% 45%,rgba(20,16,8,.86),rgba(4,5,8,.97));
+  color:var(--txt);text-align:center;padding:24px;
+  animation:tcfade .9s ease-out both;pointer-events:none;
+}
+.titlecard .tc-kicker{font:700 11px var(--disp);letter-spacing:.34em;color:var(--dim);text-transform:uppercase}
+.titlecard .tc-main{font:800 44px/1.1 var(--disp);letter-spacing:.12em;color:var(--gold)}
+.titlecard .tc-sub{font-style:italic;color:var(--dim);font-size:14px}
+.titlecard.win .tc-main{color:var(--gold)}
+.titlecard.lose .tc-main{color:var(--red)}
+@keyframes tcfade{0%{opacity:0}18%{opacity:1}78%{opacity:1}100%{opacity:0}}
+
+/* ---------- buttons: engraved stone / brass ---------- */
+button.act{
+  position:relative;
+  min-height:52px;padding:12px 18px;
+  font-family:var(--disp);font-size:13px;font-weight:700;letter-spacing:.08em;
+  color:var(--txt);cursor:pointer;border-radius:11px;
+  background:linear-gradient(180deg,var(--stone-hi) 0%,var(--stone-lo) 88%);
+  border:1px solid #2c3346;border-top-color:#3b4459;border-bottom-color:#0b0d13;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    inset 0 -3px 6px rgba(0,0,0,.42),
+    0 2px 8px rgba(0,0,0,.45);
+  text-shadow:0 1px 1px rgba(0,0,0,.55);
+  -webkit-tap-highlight-color:transparent;
+}
+button.act:active:not(:disabled){
+  transform:translateY(1px);
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.4);
+}
+button.act:disabled{opacity:.32;cursor:not-allowed}
+button.act.big{font-size:15px;letter-spacing:.12em;padding:15px 22px;min-height:56px}
+button.act.gold{
+  color:var(--gold);border-color:#5a451c;border-top-color:#6d5524;
+  background:linear-gradient(180deg,#2b2312 0%,#1a1408 88%);
+  box-shadow:
+    inset 0 1px 0 rgba(232,176,75,.22),
+    inset 0 -3px 6px rgba(0,0,0,.5),
+    0 2px 8px rgba(0,0,0,.45);
+}
+button.act.danger{color:var(--red);border-color:#57242c;border-top-color:#6a2c36;
+  background:linear-gradient(180deg,#26141a 0%,#170c10 88%)}
+button.act.wide{width:100%}
+.rowbtns{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.rowbtns .grow{flex:1}
+
+/* ============================================================
+   HERO SPRITES — the shared figure system (all agents)
+   .hero-sprite         arched stone frame, big class emoji
+   .hero-sprite.lg      portrait size (hero page / reveals)
+   .hero-sprite.sm      roster portrait size
+   .hero-sprite.dead    desaturated, head-bowed — never removed
+   size = --spr-w (default 104px); screens may override locally
+   ============================================================ */
+.hero-sprite{
+  --spr-w:104px;
+  position:relative;width:var(--spr-w);height:calc(var(--spr-w)*1.16);
+  display:flex;align-items:flex-end;justify-content:center;
+  border-radius:calc(var(--spr-w)*.5) calc(var(--spr-w)*.5) 10px 10px;
+  background:
+    radial-gradient(120% 90% at 50% 0%,rgba(232,176,75,.10),rgba(0,0,0,0) 55%),
+    linear-gradient(180deg,#161a26 0%,#0d0f16 100%);
+  border:1px solid #2b3143;border-bottom-color:#0a0c11;
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,.35),
+    inset 0 -8px 14px rgba(0,0,0,.5),
+    0 4px 10px rgba(0,0,0,.4);
+  animation:spridle 2.8s ease-in-out infinite;
+  will-change:transform;
+}
+.hero-sprite .spr-emoji{
+  font-size:calc(var(--spr-w)*.5);line-height:1;
+  padding-bottom:calc(var(--spr-w)*.09);
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.55));
+}
+/* candle warmth pooling at the base of the arch */
+.hero-sprite::after{
+  content:'';position:absolute;left:12%;right:12%;bottom:0;height:26%;
+  background:radial-gradient(60% 100% at 50% 100%,rgba(232,176,75,.14),rgba(0,0,0,0) 75%);
+  pointer-events:none;
+}
+.hero-sprite.lg{--spr-w:128px}
+.hero-sprite.sm{--spr-w:56px;animation-duration:3.4s}
+.hero-sprite.sm .spr-emoji{padding-bottom:calc(var(--spr-w)*.1)}
+/* dead: greyed, head bowed, the light in the arch gone out */
+.hero-sprite.dead{
+  animation:none;
+  filter:saturate(.18) brightness(.6);
+  background:linear-gradient(180deg,#101218 0%,#0a0b0f 100%);
+  border-color:#1c202b;
+}
+.hero-sprite.dead::after{opacity:.25}
+.hero-sprite.dead .spr-emoji{
+  transform:rotate(6deg) translate(6%,10%);
+  filter:grayscale(.9) brightness(.7);
+}
+/* empty arch (vacant party slot) */
+.hero-sprite.ghost{
+  animation:none;background:none;border:1px dashed rgba(143,138,122,.3);
+  box-shadow:none;filter:none;
+}
+.hero-sprite.ghost .spr-emoji{opacity:.22;filter:none}
+@keyframes spridle{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-3px)}
+}
+/* nameplate sits UNDER the sprite — never beside a stats row */
+.nameplate{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+.nameplate .np-name{font:700 13px var(--disp);letter-spacing:.08em;color:var(--txt)}
+.nameplate .np-sub{font-size:11px;color:var(--dim);letter-spacing:.04em}
+.nameplate .np-sub.low{color:var(--red)}
+
+/* ---------- bars (thin, candle-lit) ---------- */
+.bar{height:8px;background:rgba(0,0,0,.5);border-radius:4px;overflow:hidden;margin:3px 0;position:relative}
+.bar i{display:block;height:100%;background:var(--green);border-radius:4px;
+  box-shadow:0 0 6px rgba(95,191,119,.25)}
+.bar i.low{background:var(--red);box-shadow:0 0 6px rgba(224,82,99,.3)}
+.bar i.gold{background:var(--gold);box-shadow:0 0 6px rgba(232,176,75,.3)}
+.bar i.blue{background:var(--blue)}
+.bar.slim{height:5px}
+
+/* ============================================================
+   LOBBY — "this is my team": the party stands together center
+   ============================================================ */
+.party-stage{
+  position:relative;
+  display:flex;justify-content:center;align-items:flex-end;gap:16px;
+  margin:20px 0 4px;min-height:196px;
+}
+/* the floor they stand on: one candle-gold line */
+.party-stage::before{
+  content:'';position:absolute;left:-6%;right:-6%;bottom:6px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--hair-strong) 22%,var(--hair-strong) 78%,transparent);
+}
+.party-member{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  cursor:pointer;position:relative;padding-bottom:14px;
+  -webkit-tap-highlight-color:transparent;
+}
+.party-member:active .hero-sprite{transform:scale(.97)}
+.party-member:nth-child(2) .hero-sprite{animation-delay:-.9s}
+.party-member:nth-child(3) .hero-sprite{animation-delay:-1.7s}
+.party-member .pm-x{
+  position:absolute;top:-6px;right:-8px;z-index:2;
+  width:26px;height:26px;border-radius:50%;
+  background:rgba(13,16,26,.9);border:1px solid var(--line);
+  color:var(--dim);font-size:12px;line-height:1;cursor:pointer;
+}
+.party-member .pm-x:active{color:var(--red);border-color:var(--red)}
+.party-member.empty{cursor:default;opacity:.55}
+.stage-empty{
+  align-self:center;text-align:center;color:var(--dim);font-style:italic;
+  font-size:13.5px;line-height:1.7;padding:26px 20px;
+}
+
+/* roster: a quiet horizontal strip of small portraits */
+.roster-strip{
+  display:flex;gap:14px;overflow-x:auto;
+  margin:6px -16px 4px;padding:6px 16px 10px;
+  scrollbar-width:thin;
+}
+.rslot{
+  flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;
+  cursor:pointer;opacity:.78;transition:opacity .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.rslot:active{opacity:1}
+.rslot .rnm{
+  font:700 10.5px var(--disp);letter-spacing:.05em;color:var(--dim);
+  max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.rslot.inparty .hero-sprite{border-color:var(--hair-strong);
+  box-shadow:inset 0 0 0 1px rgba(232,176,75,.25),0 4px 10px rgba(0,0,0,.4)}
+.rslot.inparty .rnm{color:var(--gold)}
+
+/* the one bottom action bar */
+.lobby-actions{display:flex;gap:10px;margin:18px 0 6px}
+.lobby-actions .act{flex:1;min-height:54px;padding:12px 8px;font-size:12px;letter-spacing:.06em}
+
+/* master panel: slim parchment strip */
+.mpanel{
+  background:linear-gradient(180deg,#1d1810 0%,#14100a 100%);
+  border:1px solid var(--parchment-edge);border-left:2px solid var(--gold);
+  border-radius:8px;padding:9px 13px;margin:14px 0 4px;
+}
+.mpanel .mp-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mpanel .mp-lv{font:700 11px var(--disp);letter-spacing:.18em;color:var(--ink)}
+.mpanel .mp-lv b{color:var(--gold);font-size:13px;letter-spacing:.1em}
+.mpanel .mp-exp{color:var(--dim);font-size:11.5px;white-space:nowrap}
+.mpanel .mp-next{font-size:11.5px;color:var(--dim);margin-top:4px;font-style:italic}
+
+/* ---------- stars ---------- */
+.stars{color:var(--gold);letter-spacing:1px;font-size:12px;white-space:nowrap}
+.stars.r1{color:var(--r1)} .stars.r2{color:var(--r2)}
+.stars.r3{color:var(--r3)} .stars.r4{color:var(--r4)}
+
+/* ============================================================
+   HERO PROFILE — a page in a book: arched portrait, chapters
+   ============================================================ */
+.pf-portrait{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  text-align:center;margin:6px 0 4px;
+}
+.pf-portrait .hero-sprite{margin-bottom:6px}
+.pf-name{font:800 26px var(--disp);letter-spacing:.14em;margin-top:2px}
+.pf-cls{font:700 11px var(--disp);letter-spacing:.3em;text-transform:uppercase;color:var(--dim)}
+.pf-stars{margin-top:2px}
+.pf-pers{margin-top:8px;font-style:italic;color:var(--dim);font-size:13.5px;line-height:1.55}
+.pf-pers b{color:var(--txt);font-style:normal}
+.pf-down{margin-top:6px;color:var(--red);font-style:italic;font-size:12.5px}
+/* stats demoted to one quiet line — the person is the hero */
+.statline{
+  text-align:center;color:var(--dim);font-size:12px;letter-spacing:.03em;
+  margin:10px 0 4px;padding-bottom:12px;border-bottom:1px solid var(--hair);
+}
+.statline b{color:var(--txt);font-weight:700}
+
+/* chapters: kicker + prose, never tables */
+.chapter{margin:20px 0}
+.chapter-kicker{
+  display:flex;align-items:baseline;gap:10px;
+  font:700 11px var(--disp);letter-spacing:.3em;color:var(--gold);
+  text-transform:uppercase;margin-bottom:10px;
+}
+.chapter-kicker .chn{color:var(--dim);letter-spacing:.15em}
+.chapter-kicker::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--hair),transparent);align-self:center}
+.chapter .prose{color:var(--dim);font-size:14px;line-height:1.65}
+.chapter .prose b{color:var(--txt)}
+.chapter .prose em{color:var(--txt)}
+.kvrow{display:flex;justify-content:space-between;font-size:13.5px;color:var(--dim);padding:3px 0}
+.kvrow b{color:var(--txt)}
+
+/* kit entries: titled prose + quiet chips */
+.kitrow{margin:10px 0;padding-left:12px;border-left:1px solid var(--hair)}
+.kitrow .kitname{font:700 13.5px var(--disp);letter-spacing:.06em;color:var(--txt)}
+.kitrow .kitdesc{color:var(--dim);font-size:13px;font-style:italic;margin-top:2px;line-height:1.55}
+.kitchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{
+  font-size:9.5px;font-weight:800;letter-spacing:.8px;padding:2px 7px;
+  border-radius:4px;border:1px solid var(--line);color:var(--dim);
+  background:rgba(0,0,0,.25);white-space:nowrap;
+}
+.chip.pwr{color:var(--red);border-color:rgba(224,82,99,.4)}
+.chip.heal{color:var(--green);border-color:rgba(95,191,119,.4)}
+.chip.cd{color:var(--gold);border-color:var(--hair-strong)}
+.chip.once{color:var(--blue);border-color:rgba(90,162,232,.4)}
+.chip.cost{color:var(--red);border-color:rgba(224,82,99,.4)}
+.chip.cond{color:var(--blue)}
+.kit-empty{color:var(--dim);font-style:italic;font-size:13px;padding:4px 0}
+.reactionrow{
+  margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);
+  font-size:13.5px;color:var(--dim);font-style:italic;line-height:1.55;
+}
+.reactionrow .rx-tag{
+  font-style:normal;font-weight:800;letter-spacing:.2em;
+  font-size:10px;color:var(--gold);margin-right:7px;font-family:var(--disp);
+}
+.reactionrow b{color:var(--txt);font-style:normal}
+.reactionrow.traitrow{margin-top:8px}
+.reactionrow.traitrow .rx-tag{color:var(--blue)}
+
+/* the mind: axes as thin candle-gold bars */
+.axline{display:grid;grid-template-columns:76px 1fr 30px;align-items:center;gap:10px;margin:9px 0}
+.axline .lab{font:700 10px var(--disp);letter-spacing:.22em;color:var(--dim)}
+.axline .num{text-align:right;font-size:11px;color:var(--ink)}
+.axisbar{position:relative;height:3px;background:rgba(0,0,0,.5);overflow:hidden;border-radius:2px}
+.axisbar .fill{position:absolute;top:0;left:0;bottom:0;border-radius:2px;
+  background:linear-gradient(90deg,rgba(232,176,75,.55),var(--gold));
+  box-shadow:0 0 6px rgba(232,176,75,.35)}
+.axisbar .ticks{
+  position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),rgba(143,138,122,.22) calc(10% - 1px),rgba(143,138,122,.22) 10%);
+}
+
+/* bonds: thin bars, names in prose order */
+.bondrow{display:grid;grid-template-columns:84px 1fr 62px;gap:10px;align-items:center;margin:9px 0}
+.bondrow .bnm{font-size:12.5px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bondbar{position:relative;height:3px;background:rgba(0,0,0,.5);overflow:hidden;border-radius:2px}
+.bondbar i{position:absolute;top:0;bottom:0;border-radius:2px;min-width:1px}
+.bondbar i.pos{left:50%;background:var(--green)}
+.bondbar i.neg{right:50%;background:var(--red)}
+.bondbar::after{content:'';position:absolute;left:50%;top:-1px;bottom:-1px;width:1px;background:var(--dim);opacity:.5}
+.bondrow .blab{text-align:right;font:800 9.5px var(--disp);letter-spacing:.14em}
+.bondrow .blab.rival{color:var(--red)}
+.bondrow .blab.neutral{color:var(--dim)}
+.bondrow .blab.bonded{color:var(--green)}
+.mournrow{
+  display:flex;align-items:center;gap:8px;color:var(--dim);
+  font-size:12.5px;font-style:italic;padding:7px 0;border-bottom:1px dashed var(--line);
+}
+.mem-item{font-size:13.5px;color:var(--dim);font-style:italic;margin:8px 0;line-height:1.55}
+.mem-item .fl{font-style:normal;font-size:11px;color:var(--ink);opacity:.85;letter-spacing:.06em}
+
+/* gear: worn slots + pack (quiet rows, engraved small buttons) */
+.eqslot,.invrow{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;margin:7px 0;min-height:52px;
+}
+.eqslot .eqi,.invrow .eqi{min-width:0;flex:1}
+.eqslot .eqnm,.invrow .eqnm{font-weight:700;font-size:13.5px}
+.eqslot .eqnm.dim,.invrow .eqnm.dim{color:var(--dim);font-weight:400;font-style:italic}
+.eqslot .eqst,.invrow .eqst{color:var(--gold);font-size:11.5px;margin-top:2px;letter-spacing:.5px}
+.eqslot .eqhist,.invrow .eqhist{color:var(--dim);font-size:11px;font-style:italic;margin-top:2px}
+.eqslot .eqmeta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.eqslot .slottag{font:800 9px var(--disp);color:var(--ink);letter-spacing:.24em}
+.eqslot button,.invrow button{min-height:44px;min-width:92px;padding:8px 12px;font-size:11.5px}
+.eqinvh{font:700 10px var(--disp);color:var(--dim);letter-spacing:.28em;margin:16px 0 6px}
+
+/* ============================================================
+   TOWER — carved ledges climbing into the dark
+   ============================================================ */
+.tower{margin-top:4px}
+.frow{
+  position:relative;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  min-height:64px;padding:13px 4px 15px;margin:0;cursor:pointer;
+  background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,0) 82%);
+  border:none;border-top:1px solid rgba(143,138,122,.14);
+  border-radius:0;
+}
+.frow:first-child{border-top:none}
+/* the carved ledge edge under each stair */
+.frow::after{
+  content:'';position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:linear-gradient(90deg,rgba(0,0,0,.65),rgba(0,0,0,.28) 30%,rgba(0,0,0,.28) 70%,rgba(0,0,0,.65)),
+             linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,0));
+  border-radius:2px;
+}
+.frow:active:not(.locked){background:linear-gradient(180deg,rgba(232,176,75,.06),rgba(255,255,255,0) 90%)}
+.frow .fmain{display:flex;flex-direction:column;gap:3px;min-width:0}
+.frow .fname{font:800 16px var(--disp);letter-spacing:.14em;color:var(--txt)}
+.frow .fthreat{font:700 9.5px var(--disp);letter-spacing:.3em;color:var(--gold);opacity:.85}
+.frow .frule{font-size:11px;letter-spacing:.05em;color:var(--dim);font-style:italic}
+.frow .frule b{color:var(--txt);font-style:normal;font-variant:small-caps;letter-spacing:.12em}
+.frow .fstat{font:700 10.5px var(--disp);letter-spacing:.18em;color:var(--dim);text-align:right;white-space:nowrap}
+.frow.cleared .fname{color:var(--dim)}
+.frow.cleared .fstat{color:var(--green)}
+.frow.locked{opacity:.32;cursor:not-allowed}
+.frow.next .fstat{color:var(--gold)}
+.frow.next .fname{text-shadow:0 0 14px rgba(232,176,75,.35)}
+.frow.wall .fname{color:var(--red)}
+.frow.wall .fstat{color:var(--red)}
+.frow.wall.cleared .fname{color:var(--green)}
+.frow.wall.cleared .fstat{color:var(--green)}
+.frow.ml .fstat{color:var(--red)}
+
+/* knowledge: parchment notes */
+.panel{
+  background:linear-gradient(180deg,#1c1712 0%,#14100b 100%);
+  border:1px solid var(--parchment-edge);border-left:2px solid var(--gold);
+  border-radius:8px;padding:13px 15px;margin-top:16px;
+}
+.panel h3{font:700 11px var(--disp);letter-spacing:.22em;color:var(--gold);margin-bottom:8px}
+.kv{color:var(--dim);font-size:13.5px;line-height:1.6}
+.kv b{color:var(--txt)}
+.unknown{color:var(--red);font-style:italic}
+
+/* ============================================================
+   MEMORIAL — a wall of arched stone plaques
+   ============================================================ */
+.memorial-wall{display:flex;flex-direction:column;gap:14px;margin-top:6px}
+.plaque{
+  position:relative;text-align:center;
+  background:linear-gradient(180deg,#151823 0%,#0e1017 100%);
+  border:1px solid #262c3a;border-bottom-color:#0a0c11;
+  border-radius:72px 72px 8px 8px;
+  padding:20px 18px 13px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,.3),
+    inset 0 -8px 14px rgba(0,0,0,.45),
+    0 3px 8px rgba(0,0,0,.4);
+}
+.plaque .pl-kicker{font:700 9px var(--disp);letter-spacing:.34em;color:var(--dim)}
+.plaque .pl-name{font:800 18px var(--disp);letter-spacing:.16em;margin:5px 0 2px}
+.plaque .dead-tag{color:var(--red);font:800 9px var(--disp);letter-spacing:.3em}
+.plaque .pl-ic{font-size:22px;opacity:.75;margin-bottom:2px}
+.plaque .pl-sub{color:var(--dim);font-size:12px;margin-top:5px;letter-spacing:.04em}
+.plaque .pl-sub b{color:var(--red)}
+.plaque .pl-epi{color:var(--dim);font-style:italic;font-size:13px;margin-top:8px;line-height:1.55}
+.plaque .pl-carry,.plaque .pl-mourn{color:var(--dim);font-size:11.5px;margin-top:5px;letter-spacing:.02em}
+.plaque .pl-mourn{font-style:italic}
+
+/* ---------- map screen containers (map internals: map.js) ---------- */
+.tstrip{
+  display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  background:rgba(17,20,28,.7);border:1px solid var(--line);border-radius:10px;
+  padding:8px 14px;margin-bottom:10px;color:var(--dim);font-size:13px;
+}
+.tstrip b{color:var(--txt)}
+#map-box{
+  position:relative;background:#080a0e;border:1px solid var(--line);
+  border-radius:12px;height:330px;overflow:hidden;margin:10px 0;
+}
+.hpstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.hpcell{background:rgba(17,20,28,.7);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px}
+.hpcell .h1{display:flex;justify-content:space-between;gap:6px}
+.hpcell .h1 span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- event / battle containers ---------- */
+#event-box{margin:8px 0}
+#battle-view{display:flex;flex-direction:column;gap:10px;min-height:300px}
+
+/* ---------- loot / campfire cards (objects — card allowed) ---------- */
+.lootcard{
+  background:linear-gradient(180deg,#1c1712,#14100b);
+  border:1px solid var(--parchment-edge);border-left:2px solid var(--gold);
+  border-radius:12px;padding:22px 18px;text-align:center;margin:14px 0;
+}
+.lootcard .lic{font-size:38px}
+.lootcard .lt{font:700 14px var(--disp);letter-spacing:.3em;color:var(--gold);margin:8px 0 4px}
+.lootcard .amt{font-size:30px;font-weight:800;color:var(--gold)}
+.lootcard .fl{color:var(--dim);font-style:italic;font-size:13px;margin:8px 0 2px}
+.restcard{
+  background:linear-gradient(180deg,#141a15,#0d120e);
+  border:1px solid #1f3327;border-left:2px solid var(--green);
+  border-radius:12px;padding:22px 18px;text-align:center;margin:14px 0;
+}
+.restcard .lic{font-size:38px}
+.restcard .lt{font:700 14px var(--disp);letter-spacing:.3em;color:var(--green);margin:8px 0 4px}
+.restcard .fl{color:var(--dim);font-style:italic;font-size:13px;margin:8px 0 2px}
+.remainscard{
+  background:linear-gradient(180deg,#151823,#0e1017);
+  border:1px solid #262c3a;border-left:2px solid var(--dim);
+  border-radius:12px;padding:22px 16px;text-align:center;margin:14px 0;
+}
+.remainscard .ric{font-size:38px;line-height:1.1}
+.remainscard .rt{font:700 12px var(--disp);letter-spacing:.3em;color:var(--dim);margin:8px 0 4px}
+.remainscard .rnm{font:800 20px var(--disp);letter-spacing:.1em}
+.remainscard .rsub{color:var(--dim);font-size:12.5px;margin-top:3px}
+.remainscard .repi{color:var(--dim);font-style:italic;font-size:13px;margin-top:8px}
+.remainscard .rgear{margin-top:12px;text-align:left;border-top:1px dashed var(--line);padding-top:4px}
+.remainscard .gitem{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px;
+}
+.remainscard .gitem .gst{color:var(--gold);font-size:11.5px;white-space:nowrap}
+
+/* ---------- result screen ---------- */
+.rhead{
+  text-align:center;font-family:var(--disp);font-weight:800;
+  font-size:21px;letter-spacing:.24em;border-radius:12px;
+  padding:16px 10px;margin:6px 0 12px;border:1px solid var(--line);
+}
+.rhead.win{color:var(--gold);border-color:var(--gold);background:rgba(232,176,75,.06)}
+.rhead.lose{color:var(--red);border-color:var(--red);background:rgba(224,82,99,.06)}
+.rhead.mid{color:var(--dim)}
+.rline{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:13.5px;color:var(--dim);border-bottom:1px dashed rgba(143,138,122,.16)}
+.rline b{color:var(--txt)}
+.rline .gold{color:var(--gold)}
+.deadcard{
+  background:rgba(17,20,28,.7);border:1px solid var(--line);border-left:3px solid var(--red);
+  border-radius:10px;padding:10px 13px;margin:8px 0;
+}
+.deadcard .dnm{font-weight:700}
+.deadcard .dsub{color:var(--dim);font-size:12.5px;margin-top:2px}
+.deadcard .depi{color:var(--dim);font-style:italic;font-size:12.5px;margin-top:4px}
+.griefline{padding:6px 0;font-size:14px;color:var(--dim);border-bottom:1px dashed rgba(143,138,122,.16)}
+.griefline:last-child{border-bottom:none}
+.rline .lean{color:var(--txt);font-size:12px;text-align:right;max-width:62%}
+
+/* ---------- recruit reveal: the arched gate ---------- */
+.reveal{text-align:center;padding:6px 4px 2px}
+.reveal .rv-tag{font:700 9.5px var(--disp);letter-spacing:.34em;color:var(--dim);text-transform:uppercase}
+.reveal .rv-sprite{display:flex;justify-content:center;margin:12px 0 6px}
+.reveal .rv-name{font:800 26px var(--disp);letter-spacing:.16em;margin:2px 0}
+.reveal .rv-cls{font:700 11px var(--disp);letter-spacing:.28em;text-transform:uppercase;margin-bottom:6px}
+.reveal .rv-line{color:var(--dim);font-style:italic;font-size:13.5px;margin:10px 0 4px;line-height:1.55}
+.reveal .rv-line b{color:var(--txt);font-style:normal}
+.reveal .rv-stats{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--dim);margin:8px 0}
+.reveal .rv-stats b{color:var(--txt)}
+.reveal .axwrap{max-width:280px;margin:10px auto 0;text-align:left}
+@keyframes rvin{from{opacity:0;transform:translateY(10px) scale(.96)}}
+
+/* ---------- toasts ---------- */
+#toasts{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(80px + env(safe-area-inset-bottom,0px));
+  display:flex;flex-direction:column;gap:8px;z-index:99;
+  width:min(92vw,380px);pointer-events:none;
+}
+.toast{
+  background:linear-gradient(180deg,#1d1810,#14100a);border:1px solid var(--parchment-edge);
+  border-left:2px solid var(--gold);color:var(--txt);
+  border-radius:10px;padding:11px 14px;font-size:13.5px;line-height:1.45;
+  animation:tin .25s;box-shadow:0 4px 18px rgba(0,0,0,.55);
+}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+
+/* ---------- overlay ---------- */
+#overlay{
+  position:fixed;inset:0;z-index:90;
+  background:rgba(4,5,8,.94);
+  display:flex;align-items:center;justify-content:center;
+  padding:22px 18px;padding-top:calc(22px + env(safe-area-inset-top,0px));
+  overflow-y:auto;
+}
+#overlay.hidden{display:none}
+.obox{
+  background:linear-gradient(180deg,#1c1712,#120e09);
+  border:1px solid var(--parchment-edge);border-radius:14px;
+  max-width:360px;width:100%;padding:20px 18px;text-align:center;
+  animation:tin .25s;
+}
+.obox h3{font:700 17px var(--disp);letter-spacing:.22em;margin-bottom:10px;color:var(--gold)}
+.obox p{color:var(--dim);font-size:13.5px;margin:9px 0;line-height:1.6}
+.obox p b{color:var(--txt)}
+.obox p.warn{color:var(--red)}
+.obox .obtns{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.obox .obtns .act{width:100%}
+.obox .orsplit{display:flex;gap:10px}
+.obox .orsplit .act{flex:1}
+
+/* ---------- module error card ---------- */
+.moderr{
+  background:rgba(224,82,99,.08);border:1px dashed var(--red);border-radius:10px;
+  padding:14px;color:var(--red);font-size:13px;margin:12px 0;line-height:1.5;
+}
+.moderr b{letter-spacing:.1em}
+
+/* ---------- V0.5: floor-rule chip (battle header) ---------- */
+.rulechip{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  background:rgba(17,20,28,.7);border:1px solid var(--line);border-left:3px solid var(--gold);
+  border-radius:10px;padding:8px 12px;margin:0 0 10px;
+  font-size:12px;color:var(--dim);line-height:1.4;
+}
+.rulechip b{color:var(--txt);letter-spacing:.1em;white-space:nowrap}
+.rulechip.rc-dark{border-left-color:var(--axFear)}
+.rulechip.rc-blood{border-left-color:var(--red)}
+.rulechip.rc-betray{border-left-color:var(--green)}
+.rulechip.rc-king{border-left-color:var(--red);background:rgba(224,82,99,.08)}
+.rulechip.rc-king b{color:var(--red)}
+
+/* ---------- V0.6: master command rail (battle screen) ---------- */
+#it-cmdrail{display:flex;flex-direction:column;gap:5px;margin:2px 0}
+#it-cmdrail .mcr-btns{display:flex;gap:6px;flex-wrap:wrap}
+.mcr-btn{
+  flex:1 1 30%;min-height:44px;min-width:96px;
+  background:linear-gradient(180deg,#241f12,#161207);color:var(--gold);
+  border:1px solid rgba(232,176,75,.4);border-top-color:rgba(232,176,75,.55);
+  border-radius:9px;font:800 11px var(--disp);letter-spacing:.12em;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(232,176,75,.15),inset 0 -2px 4px rgba(0,0,0,.4);
+}
+.mcr-btn:active:not(:disabled){transform:translateY(1px)}
+.mcr-btn:disabled{color:var(--dim);border-color:var(--line);cursor:not-allowed;opacity:.5;box-shadow:none}
+#it-cmdrail .mcr-note{font-size:10.5px;color:var(--dim);font-style:italic;line-height:1.4}
+
+/* ---------- motion & misc ---------- */
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+}
+::selection{background:var(--gold);color:#07080c}
+
+/* ==== AGENT-FEEL-B: scoped battle styles append below ==== */
+
+/* ==== AGENT-FEEL-C: scoped expedition styles (V0.8) =====================
+   EXPEDITION screens only — map scene (torchlit climb frame over map.js's
+   own render), marching party strip, flavor line, node moments (treasure /
+   rest / remains), result title card + parchment ledger, event container.
+   Shares AGENT-FEEL-A's .titlecard / .hero-sprite / tokens (--hair,
+   --parchment, --disp, --body); scoped fallbacks mirror A's sprite frame
+   so the strip survives even mid-merge. No edits above this block.
+   ======================================================================== */
+
+/* ---------- scene shell ---------- */
+.exp-scene{padding:2px 0 4px}
+.exp-kicker{
+  display:flex;align-items:center;gap:9px;
+  font:700 11px var(--disp);letter-spacing:.3em;text-transform:uppercase;
+  color:var(--gold);margin:4px 0 6px;white-space:nowrap;
+}
+.exp-kicker .k-floor{color:var(--txt)}
+.exp-kicker .k-rule{color:var(--dim);letter-spacing:.22em}
+.exp-kicker .dot{flex:none;width:3px;height:3px;border-radius:50%;background:var(--hair-strong)}
+.exp-kicker::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--hair-strong),transparent)}
+.exp-tally{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  color:var(--dim);font-size:12px;font-style:italic;margin:2px 0 8px;
+}
+.exp-tally b{color:var(--txt);font-style:normal}
+.exp-tally .dot{color:var(--hair-strong);font-style:normal}
+
+/* ---------- the climb: torchlit frame around map.js's render ---------- */
+.climb-frame{
+  position:relative;border-radius:14px;margin:6px 0 4px;
+  border:1px solid var(--line);
+  background:
+    radial-gradient(46% 30% at 50% 0%, rgba(232,176,75,.09), rgba(0,0,0,0) 70%),
+    radial-gradient(60% 26% at 50% 106%, rgba(232,176,75,.13), rgba(0,0,0,0) 72%),
+    radial-gradient(120% 100% at 50% 45%, #10131c 0%, #07080c 78%);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.55), 0 6px 18px rgba(0,0,0,.35);
+}
+.climb-frame #map-box{
+  position:relative;height:358px;margin:0;
+  background:none;border:none;border-radius:inherit;
+}
+.climb-frame .it-mapwrap{
+  height:100%;min-height:358px;border:none;border-radius:0;background:transparent;
+}
+/* darkness vignette at the edges — never eats a click */
+.climb-frame::after{
+  content:'';position:absolute;inset:0;z-index:5;border-radius:inherit;
+  background:
+    radial-gradient(78% 62% at 50% 46%, rgba(0,0,0,0) 46%, rgba(3,4,7,.55) 82%, rgba(2,3,6,.92) 100%);
+  box-shadow:inset 0 0 26px rgba(0,0,0,.75);
+  pointer-events:none;
+}
+/* node restyle: stone discs over map.js's base (specificity beats its
+   injected sheet; type hues / reach / cleared states still apply) */
+.climb-frame .it-mapwrap .mapnode{
+  background:radial-gradient(circle at 34% 28%, #262c3f 0%, #12151d 72%);
+  border:1px solid #2e3548;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    inset 0 -6px 10px rgba(0,0,0,.5),
+    0 3px 8px rgba(0,0,0,.55);
+}
+.climb-frame .it-mapwrap .mapnode.reach{
+  border-color:#4a5268;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -6px 10px rgba(0,0,0,.5),
+    0 0 14px rgba(232,176,75,.22);
+}
+.climb-frame .it-mapwrap .mapnode.cur{
+  border-color:var(--gold);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    inset 0 -6px 10px rgba(0,0,0,.5),
+    0 0 0 2px rgba(232,176,75,.85),
+    0 0 22px rgba(232,176,75,.42);
+  animation:curpulse 2.6s ease-in-out infinite;
+}
+.climb-frame .it-mapwrap .mapnode.cur .ic{text-shadow:0 0 10px rgba(232,176,75,.65)}
+@keyframes curpulse{
+  0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -6px 10px rgba(0,0,0,.5),
+    0 0 0 2px rgba(232,176,75,.85),0 0 18px rgba(232,176,75,.32)}
+  50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -6px 10px rgba(0,0,0,.5),
+    0 0 0 2px rgba(232,176,75,.95),0 0 30px rgba(232,176,75,.55)}
+}
+/* torchlit edges: dead paths sink, live paths hold candle-warm light */
+.climb-frame .it-mapsvg line{stroke:#232838;stroke-width:.7}
+.climb-frame .it-mapsvg line.e-live{stroke:rgba(232,176,75,.38);stroke-width:.95}
+
+/* ---------- flavor line ---------- */
+.map-flavor{
+  text-align:center;font-style:italic;color:var(--dim);
+  font-size:13.5px;margin:8px 0 14px;letter-spacing:.02em;
+}
+
+/* ---------- marching party strip ---------- */
+.march-strip{display:flex;justify-content:center;gap:16px;margin:2px 0 6px}
+.march-fig{display:flex;flex-direction:column;align-items:center;gap:5px;width:86px;min-width:0}
+/* sizes A's shared sprite for the road; the frame declarations mirror
+   A's so the figure stands alone if the core block shifts mid-merge */
+.march-strip .hero-sprite{
+  --spr-w:64px;
+  position:relative;width:var(--spr-w);height:calc(var(--spr-w)*1.16);
+  display:flex;align-items:flex-end;justify-content:center;
+  border-radius:calc(var(--spr-w)*.5) calc(var(--spr-w)*.5) 10px 10px;
+  background:linear-gradient(180deg,#161a26 0%,#0d0f16 100%);
+  border:1px solid #2b3143;border-bottom-color:#0a0c11;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35),0 4px 10px rgba(0,0,0,.4);
+}
+.march-strip .hero-sprite .spr-emoji{
+  font-size:calc(var(--spr-w)*.5);line-height:1;
+  filter:drop-shadow(0 3px 5px rgba(0,0,0,.55));
+}
+.march-strip .march-fig:nth-child(2) .hero-sprite{animation-delay:-.9s}
+.march-strip .march-fig:nth-child(3) .hero-sprite{animation-delay:-1.7s}
+.march-name{
+  font:700 11px var(--disp);letter-spacing:.07em;color:var(--txt);
+  max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.march-hp{
+  width:100%;height:3px;border-radius:2px;overflow:hidden;
+  background:rgba(0,0,0,.6);box-shadow:0 1px 0 rgba(0,0,0,.4);
+}
+.march-hp i{display:block;height:100%;background:var(--green);border-radius:2px}
+.march-hp i.low{background:var(--red)}
+.march-fig.vacant{opacity:.5}
+.march-fig.down .march-name{color:var(--dim)}
+
+/* ---------- quiet carved controls ---------- */
+.map-actions{display:flex;gap:10px;margin:12px 0 6px}
+.map-actions .act{
+  flex:1;min-height:46px;padding:9px 14px;
+  font-size:12.5px;letter-spacing:.05em;font-weight:600;
+  color:var(--dim);
+  background:linear-gradient(180deg,#151927 0%,#0e111b 100%);
+  border:1px solid #262c3e;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 2px 5px rgba(0,0,0,.4);
+  text-shadow:0 1px 0 rgba(0,0,0,.7);
+}
+.map-actions .act:active:not(:disabled){
+  transform:translateY(1px);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.6);
+}
+.map-actions .act:disabled{opacity:.35}
+.map-actions #m-abandon{
+  color:rgba(224,82,99,.85);border-color:rgba(224,82,99,.3);
+}
+.map-actions.solemn{flex-direction:column;margin-top:14px}
+.map-actions.solemn .act{min-height:50px;font-size:14px;color:var(--txt)}
+.map-actions.solemn #rm-bury{color:var(--dim)}
+
+/* ---------- node moments (treasure / rest / remains) ---------- */
+.node-scene{text-align:center;padding:6px 2px}
+.node-moment{max-width:340px;margin:0 auto;padding:18px 6px 4px;animation:nmoment .5s ease-out both}
+@keyframes nmoment{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.node-icon{
+  font-size:64px;line-height:1;margin-bottom:12px;
+  filter:drop-shadow(0 6px 20px rgba(232,176,75,.28));
+}
+.node-icon.fire{animation:torchflicker 2.4s ease-in-out infinite}
+@keyframes torchflicker{
+  0%,100%{filter:drop-shadow(0 6px 18px rgba(232,176,75,.3));transform:none}
+  40%{filter:drop-shadow(0 8px 26px rgba(232,176,75,.44));transform:translateY(-1px) scale(1.02)}
+  70%{filter:drop-shadow(0 5px 16px rgba(232,176,75,.24));transform:none}
+}
+.node-icon.dim{filter:grayscale(.35) drop-shadow(0 6px 16px rgba(0,0,0,.5))}
+.node-title{font:800 22px var(--disp);letter-spacing:.18em;color:var(--gold);margin:2px 0 6px}
+.node-title.small{font-size:14px;letter-spacing:.24em;color:var(--dim)}
+.node-amount{font:800 34px var(--disp);color:var(--gold)}
+.node-amount small{font-size:18px;letter-spacing:.05em}
+.node-prose{
+  font-family:var(--body);font-size:15.5px;line-height:1.65;color:var(--txt);
+  max-width:300px;margin:12px auto 0;
+}
+.node-prose.node-quiet{color:var(--dim);font-size:13.5px;font-style:italic}
+.node-quote{font-style:italic;color:var(--dim);font-size:14.5px;margin:12px auto 0;max-width:300px}
+.node-quote.big{
+  font-size:16.5px;color:var(--txt);max-width:320px;margin:16px auto 4px;padding:12px 0;
+  border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+}
+.node-name{font:800 24px var(--disp);letter-spacing:.1em;color:var(--txt);margin:2px 0 4px}
+.node-sub{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.node-gear{margin:16px auto 0;max-width:320px;border-top:1px solid var(--hair);text-align:left}
+.node-gear .ng-row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:9px 2px;border-bottom:1px solid var(--hair);
+  font-size:13.5px;color:var(--txt);
+}
+.node-gear .ng-row:last-child{border-bottom:none}
+.node-gear .ng-st{color:var(--gold);font-size:11.5px;white-space:nowrap}
+
+/* ---------- result scene ---------- */
+.result-scene{padding:2px 0 4px}
+.res-titlecard{
+  text-align:center;margin:6px 0 14px;padding:22px 12px 18px;
+  border-top:1px solid var(--hair-strong);border-bottom:1px solid var(--hair-strong);
+}
+.res-titlecard .rtc-kicker{
+  font:700 10.5px var(--disp);letter-spacing:.34em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:8px;
+}
+.res-titlecard .rtc-big{
+  font:800 clamp(26px,7.4vw,34px)/1.15 var(--disp);letter-spacing:.14em;
+}
+.res-titlecard .rtc-sub{font-style:italic;color:var(--dim);font-size:13px;margin-top:8px}
+.res-titlecard.win .rtc-big{color:var(--gold);text-shadow:0 0 26px rgba(232,176,75,.35)}
+.res-titlecard.lose .rtc-big{color:var(--red);text-shadow:0 0 26px rgba(224,82,99,.3)}
+.res-titlecard.mid .rtc-big{color:var(--txt)}
+.res-ledger{
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(232,176,75,.05), rgba(0,0,0,0) 60%),
+    var(--parchment);
+  border:1px solid var(--parchment-edge);
+  border-radius:10px;padding:12px 16px 10px;margin:12px 0;
+}
+.res-ledger.deaths{background:linear-gradient(180deg,#171310 0%,var(--parchment) 60%)}
+.res-kicker{
+  font:700 11px var(--disp);letter-spacing:.26em;text-transform:uppercase;
+  color:var(--gold);margin:0 0 4px;
+}
+.result-scene .rline{
+  display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:7px 2px;font-family:var(--body);font-size:14px;color:var(--dim);
+  border-bottom:1px solid var(--hair);
+}
+.result-scene .rline:last-child{border-bottom:none}
+.result-scene .rline b{color:var(--txt)}
+.result-scene .rline .gold{color:var(--gold)}
+.result-scene .rline .lean{color:var(--txt);font-size:12px;text-align:right;max-width:62%}
+.result-scene .rline.grief span{font-style:italic}
+/* the fallen — epitaphs speak loudest */
+.res-death{padding:12px 2px 10px;border-top:1px solid var(--hair)}
+.res-death:first-of-type{border-top:none}
+.res-death .rd-nm{font:700 16px var(--disp);letter-spacing:.08em;color:var(--txt)}
+.res-death .dead-tag{
+  color:var(--red);font-size:10px;font-weight:800;letter-spacing:.2em;
+  margin-left:6px;vertical-align:middle;
+}
+.res-death .rd-sub{color:var(--dim);font-size:12.5px;margin-top:3px;font-family:var(--body)}
+.res-death .rd-epi{
+  font-family:var(--body);font-style:italic;font-size:16px;line-height:1.5;
+  color:var(--txt);margin:10px auto 2px;max-width:300px;padding:10px 6px;
+  border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+}
+
+/* ---------- event container (events.js internals untouched) ---------- */
+.event-scene #event-box{margin:10px 0;font-family:var(--body)}
+.event-scene .ev-card{
+  background:var(--parchment);border:1px solid var(--parchment-edge);
+}
+.event-scene .ev-text,.event-scene .ev-outtext{font-family:var(--body)}
+.event-scene .ev-outcard{background:var(--parchment);border-color:var(--hair-strong)}
+.event-scene .ev-opt,.event-scene .ev-hero,.event-scene .ev-continue{
+  background:linear-gradient(180deg,#171b26 0%,#10131d 100%);
+  border-color:#2b3143;
+}
+
+/* ---------- title-card beat extras (rides A's .titlecard) ---------- */
+#floor-titlecard .tc-main{font-size:52px;letter-spacing:.16em}
+.titlecard.rm{animation:none;opacity:.96}
+
+/* ==== end AGENT-FEEL-C scoped block ==== */
+
+/* ============================================================
+   V0.9.2 PIXEL PASS — whole-game retro skin (append-only override)
+   The battle scene went pixel in v0.9.1; this block skins the rest:
+   - display face (--disp) is now Press Start 2P — headers, buttons,
+     kickers, nameplates. Body prose keeps Alegreya (readability).
+   - everything square: radii retired, soft shadows become hard
+     offset "pixel shadows", gradients flattened to solid panels.
+   - .hero-sprite figures carry the procedural pixel sprite as an
+     <img class="spr-px"> (ui.js pxImg(); emoji stays as fallback).
+   - faint CRT scanlines over the whole page (body::after, no clicks).
+   Append-only: rules above stay untouched — deleting this block
+   restores the V0.8 candle look.
+   ============================================================ */
+:root{ --disp:"Press Start 2P","Cinzel",monospace; }
+
+/* square everything */
+*{border-radius:0!important}
+
+/* flat dark bg + CRT scanlines (over everything, never clickable) */
+body{
+  background:
+    repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 4px),
+    #07080c;
+  background-attachment:fixed;
+}
+body::after{
+  content:'';position:fixed;inset:0;z-index:98;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+}
+@media (prefers-reduced-motion: reduce){ body::after{opacity:.5} }
+
+/* ---- buttons: 8-bit bevel + hard offset shadow ---- */
+button.act,
+.map-actions .act,
+.mcr-btn,
+.cb-btn,
+.event-scene .ev-opt,.event-scene .ev-hero,.event-scene .ev-continue{
+  background:#1b2130!important;
+  border:2px solid!important;
+  border-color:#55617c #10131c #10131c #55617c!important;
+  box-shadow:inset 0 0 0 2px #0d1017,3px 3px 0 rgba(0,0,0,.55)!important;
+  text-shadow:none!important;
+}
+button.act:active:not(:disabled),
+.map-actions .act:active:not(:disabled),
+.mcr-btn:active:not(:disabled),
+.cb-btn:active,
+.event-scene .ev-opt:active,.event-scene .ev-hero:active,.event-scene .ev-continue:active{
+  transform:translate(2px,2px)!important;
+  box-shadow:inset 0 0 0 2px #0d1017,1px 1px 0 rgba(0,0,0,.55)!important;
+}
+button.act.gold{background:#241c0d!important;border-color:#8a6a1f #140f06 #140f06 #8a6a1f!important}
+button.act.danger{background:#221118!important;border-color:#7c3644 #12080b #12080b #7c3644!important}
+.map-actions #m-abandon{border-color:#7c3644 #12080b #12080b #7c3644!important}
+
+/* ---- panels/cards: flat slab + pixel shadow ---- */
+.mpanel,.panel,.lootcard,.restcard,.remainscard,.res-ledger,
+.toast,.obox,.plaque,.tstrip,.hpcell,.eqslot,.invrow,.deadcard,
+.rulechip,.rhead,.node-scene .ev-card,.event-scene .ev-card,
+.event-scene .ev-outcard,#it-cmdrail .mcr-note{
+  background:#11141c!important;
+  border:2px solid #2a3140!important;
+  box-shadow:3px 3px 0 rgba(0,0,0,.5)!important;
+}
+.mpanel,.panel,.lootcard{border-left:4px solid var(--gold)!important}
+.restcard{border-left:4px solid var(--green)!important}
+.remainscard{border-left:4px solid var(--dim)!important}
+.deadcard{border-left:4px solid var(--red)!important}
+#map-box,.climb-frame{border:2px solid #2a3140!important;background:#080a0e!important}
+
+/* ---- hero figures: square frame + pixel sprite ---- */
+.hero-sprite{
+  background:#10131c!important;
+  border:2px solid #2e3548!important;
+  border-radius:0!important;
+  box-shadow:inset 0 0 0 2px #0a0c11,3px 3px 0 rgba(0,0,0,.5)!important;
+}
+.hero-sprite::after{display:none!important}
+.hero-sprite .spr-px{
+  width:64%;padding-bottom:6%;
+  image-rendering:pixelated;image-rendering:crisp-edges;
+  filter:drop-shadow(2px 2px 0 rgba(0,0,0,.5));
+}
+.hero-sprite.lg .spr-px{width:72%}
+.hero-sprite.sm .spr-px{width:70%}
+.march-strip .hero-sprite .spr-px{width:64%}
+.hero-sprite.dead .spr-px{filter:grayscale(.9) brightness(.7)!important}
+.hero-sprite.ghost{border-style:dashed!important;background:none!important;box-shadow:none!important}
+.plaque .pl-ic .spr-px{width:40px;image-rendering:pixelated}
+
+/* ---- bars: square, no glow ---- */
+.bar,.bar i,.axisbar,.axisbar .fill,.bondbar,.bondbar i,
+.march-hp,.march-hp i,.cb-hpbar,.cb-hpbar i,.cb-bossbar,.cb-bossbar i{
+  border-radius:0!important;box-shadow:none!important;
+}
+.bar,.axisbar,.bondbar,.march-hp{border:1px solid #2a3140;background:#0a0c11}
+
+/* ---- type retune: PS2P is wide, sizes come down ---- */
+#hdr h1{font-size:10px;letter-spacing:.14em}
+#nav button{font-size:8px;letter-spacing:.1em}
+h2.scr{font-size:8px;letter-spacing:.2em}
+.titlecard .tc-main{font-size:24px;letter-spacing:.1em}
+#floor-titlecard .tc-main{font-size:24px}
+.titlecard .tc-kicker{font-size:8px;letter-spacing:.24em}
+.node-title{font-size:14px;letter-spacing:.1em}
+.node-title.small{font-size:9px}
+.node-name{font-size:14px;letter-spacing:.06em}
+.node-amount{font-size:22px}
+.pf-name{font-size:15px;letter-spacing:.08em}
+.pf-cls{font-size:8px;letter-spacing:.2em}
+.reveal .rv-name{font-size:15px}
+.reveal .rv-cls{font-size:8px;letter-spacing:.2em}
+.rhead{font-size:12px;letter-spacing:.12em}
+.res-titlecard .rtc-big{font-size:19px;letter-spacing:.08em}
+.res-titlecard .rtc-kicker{font-size:8px}
+.plaque .pl-name{font-size:12px;letter-spacing:.08em}
+.plaque .pl-kicker,.plaque .dead-tag{font-size:7px;letter-spacing:.22em}
+.frow .fname{font-size:12px;letter-spacing:.06em}
+.frow .fthreat{font-size:7px;letter-spacing:.2em}
+.frow .fstat{font-size:8px;letter-spacing:.1em}
+.mpanel .mp-lv b{font-size:10px}
+.lootcard .lt,.restcard .lt{font-size:10px;letter-spacing:.18em}
+.remainscard .rt{font-size:8px;letter-spacing:.18em}
+.nameplate .np-name{font-size:8px;letter-spacing:.04em}
+.nameplate .np-sub{font-size:10px}
+.march-name{font-size:8px}
+.rslot .rnm{font-size:7px;letter-spacing:.02em}
+.exp-kicker{font-size:8px;letter-spacing:.2em}
+.res-kicker,.eqinvh{font-size:8px;letter-spacing:.18em}
+.chapter-kicker{font-size:8px;letter-spacing:.22em}
+.axline .lab{font-size:7px;letter-spacing:.14em}
+.obox h3{font-size:12px;letter-spacing:.12em}
+.statline{font-size:11px}
+
+/* battle DOM fallback + scene chrome ride the same skin */
+#battle-view .cb-floor,#battle-view .cb-round{font-family:var(--disp)}
+#battle-view .cb-floor{font-size:9px;letter-spacing:.18em}
+#battle-view .cb-bossname{font-family:var(--disp);font-size:9px;letter-spacing:.08em}
+#battle-view .cb-name{font-family:var(--disp);font-size:7px;letter-spacing:.02em}
+#battle-view .cb-btn{font-family:var(--disp);font-size:9px;letter-spacing:.04em}
+#battle-view .cb-beatword{font-size:16px;letter-spacing:.3em;text-indent:.3em}
+#battle-view .cb-beatname{font-size:10px;letter-spacing:.14em}
+#battle-view .cb-tcword{font-size:16px;letter-spacing:.2em;text-indent:.2em}
+#battle-view .cb-hint,#battle-view .cb-pickhint{font-family:var(--body)}
+
+/* header/nav pixel frame */
+#hdr{background:#0d101a!important;border-bottom:2px solid #2a3140!important;box-shadow:2px 2px 0 rgba(0,0,0,.5)!important}
+#nav{background:#0a0c11!important;border-bottom:2px solid #2a3140!important}
+
+/* toasts above the scanlines */
+#toasts{z-index:100}
+
+/* ---- V0.9.2: roster filter chips + slot meta ---- */
+.rfilters{display:flex;gap:4px;flex-wrap:wrap;margin:2px -16px 8px;padding:0 16px}
+.rfchip{
+  min-height:30px;padding:5px 9px;cursor:pointer;
+  font:400 7px var(--disp);letter-spacing:.06em;color:var(--dim);
+  background:#10131c;border:2px solid #2a3140;
+  box-shadow:2px 2px 0 rgba(0,0,0,.45);
+  -webkit-tap-highlight-color:transparent;
+}
+.rfchip b{color:var(--txt);margin-left:2px}
+.rfchip.on{color:var(--gold);border-color:var(--gold)}
+.rfchip.sort{margin-left:auto;color:var(--blue)}
+.rfchip:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.45)}
+.rslot .rmeta{font:400 6px var(--disp);color:var(--dim);letter-spacing:.02em;white-space:nowrap}
+.rslot .rmeta i{font-style:normal}
+.rslot .rmeta i.r1{color:var(--r1)} .rslot .rmeta i.r2{color:var(--r2)}
+.rslot .rmeta i.r3{color:var(--r3)} .rslot .rmeta i.r4{color:var(--r4)}
+
+/* ---- V0.9.3: header sound toggle ---- */
+#hdr .hsnd{
+  background:none;border:2px solid transparent;cursor:pointer;
+  font-size:14px;line-height:1;padding:2px 4px;margin-left:-4px;
+  -webkit-tap-highlight-color:transparent;
+}
+#hdr .hsnd:active{transform:translate(1px,1px)}
+
+/* ---- V0.9.5: volume meter popup ---- */
+#volpop{
+  position:fixed;top:calc(54px + env(safe-area-inset-top,0px));right:10px;z-index:120;
+  width:230px;padding:12px 14px;
+  background:#11141c;border:2px solid #2a3140;
+  box-shadow:4px 4px 0 rgba(0,0,0,.55);
+  display:flex;flex-direction:column;gap:8px;
+}
+#volpop.hidden{display:none}
+#volpop .vp-lab{font:400 7px var(--disp);letter-spacing:.24em;color:var(--dim)}
+#volpop .vp-val{text-align:right;font:400 9px var(--disp);color:var(--gold)}
+#volpop input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;cursor:pointer;
+  touch-action:none;   /* let the drag drive the thumb, not the page scroll */
+}
+#volpop .vp-presets{display:flex;gap:4px}
+#volpop .vp-presets .rfchip{flex:1}
+#volpop input[type=range]::-webkit-slider-runnable-track{
+  height:10px;background:#0a0c11;border:2px solid #2a3140;
+}
+#volpop input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:14px;height:22px;margin-top:-8px;
+  background:var(--gold);border:2px solid #8a6a1f;box-shadow:2px 2px 0 rgba(0,0,0,.5);
+}
+#volpop input[type=range]::-moz-range-track{
+  height:10px;background:#0a0c11;border:2px solid #2a3140;
+}
+#volpop input[type=range]::-moz-range-thumb{
+  width:12px;height:20px;border-radius:0;
+  background:var(--gold);border:2px solid #8a6a1f;
+}
+
+/* ==== V0.9.4: light & mood ==== */
+/* page vignette — edges fall into dark under everything visual */
+body::before{
+  content:'';position:fixed;inset:0;z-index:97;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 42%,rgba(0,0,0,0) 55%,rgba(2,3,7,.55) 100%);
+}
+/* candle panels breathe their glow */
+@keyframes pglow{
+  0%,100%{box-shadow:3px 3px 0 rgba(0,0,0,.5)}
+  50%{box-shadow:3px 3px 0 rgba(0,0,0,.5),0 0 20px rgba(232,176,75,.14)}
+}
+.mpanel,.panel,.lootcard,.res-ledger{animation:pglow 4.5s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){
+  .mpanel,.panel,.lootcard,.res-ledger{animation:none}
+}
+
+/* ---- title splash ---- */
+#splash{
+  position:fixed;inset:0;z-index:200;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  text-align:center;padding:24px;
+  background:
+    radial-gradient(90% 55% at 50% 42%,rgba(46,36,18,.5),rgba(4,5,8,.97) 78%),
+    #05060a;
+  animation:spin .8s ease-out both;
+}
+#splash.out{animation:spout .6s ease-in both;pointer-events:none}
+@keyframes spin{from{opacity:0}to{opacity:1}}
+@keyframes spout{from{opacity:1}to{opacity:0}}
+#splash .sp-kicker{
+  font:400 7px var(--disp);letter-spacing:.3em;color:var(--dim);
+}
+#splash .sp-logo{
+  font:400 clamp(26px,9vw,40px)/1.35 var(--disp);color:var(--gold);
+  letter-spacing:.1em;text-shadow:0 0 26px rgba(232,176,75,.35),3px 3px 0 rgba(0,0,0,.7);
+}
+#splash .sp-sub{font:italic 14px var(--body);color:var(--dim)}
+#splash .sp-tap{
+  margin-top:22px;font:400 8px var(--disp);letter-spacing:.22em;color:var(--txt);
+  animation:spblink 1.4s steps(2,end) infinite;
+}
+@keyframes spblink{0%,60%{opacity:1}61%,100%{opacity:.15}}
+#splash .sp-ver{position:absolute;bottom:16px;font:400 6px var(--disp);color:var(--dim);letter-spacing:.2em}
+/* torch glows flanking the logo */
+#splash .sp-torch{
+  position:absolute;top:50%;width:110px;height:220px;transform:translateY(-50%);
+  background:radial-gradient(60% 45% at 50% 40%,rgba(232,140,75,.20),rgba(232,140,75,0) 70%);
+  animation:sptorch 2.8s ease-in-out infinite;
+}
+#splash .sp-l{left:-26px}
+#splash .sp-r{right:-26px;animation-delay:-1.4s}
+@keyframes sptorch{0%,100%{opacity:.75}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){
+  #splash .sp-tap,#splash .sp-torch{animation:none}
+}
+
+/* ---- V0.10: pressure & greed ---- */
+.exp-tally .at-risk b{color:var(--gold)}
+.exp-tally .at-risk{color:var(--red);font-style:normal}
+.dread-meter{margin:2px 0 6px}
+.dread-meter .dm-lab{
+  display:flex;align-items:baseline;gap:8px;
+  font:400 7px var(--disp);letter-spacing:.2em;color:var(--dim);
+}
+.dread-meter .dm-lab b{font-size:8px;letter-spacing:.24em}
+.dread-meter .dm-num{margin-left:auto;color:var(--dim)}
+.dread-meter .dm-bar{
+  height:8px;margin-top:4px;background:#0a0c11;border:2px solid #2a3140;
+}
+.dread-meter .dm-bar i{display:block;height:100%;background:var(--green)}
+.dread-meter.tier-uneasy .dm-lab b{color:var(--gold)}
+.dread-meter.tier-uneasy .dm-bar i{background:var(--gold)}
+.dread-meter.tier-dread .dm-lab b{color:#e0843b}
+.dread-meter.tier-dread .dm-bar i{background:#e0843b}
+.dread-meter.tier-panic .dm-lab b{color:var(--red);animation:spblink 1.1s steps(2,end) infinite}
+.dread-meter.tier-panic .dm-bar i{background:var(--red)}
+@media (prefers-reduced-motion: reduce){.dread-meter.tier-panic .dm-lab b{animation:none}}
+.risk-line{
+  color:var(--red);font:400 6.5px var(--disp);letter-spacing:.14em;
+  margin-top:10px!important;
+}
+.banked-line b{color:var(--green)}
+.banked-line{color:var(--txt)}
+
+/* ---- V0.11: supplies ---- */
+.supshop{
+  background:#11141c;border:2px solid #2a3140;
+  box-shadow:3px 3px 0 rgba(0,0,0,.5);
+  padding:10px 12px 8px;margin:4px 0 6px;
+}
+.suprow{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;border-bottom:1px dashed #262d3d;
+}
+.suprow:last-of-type{border-bottom:none}
+.sup-ic{font-size:20px;width:26px;text-align:center}
+.sup-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sup-info b{font:400 8px var(--disp);letter-spacing:.08em;color:var(--txt)}
+.sup-info em{font-style:italic;font-size:11.5px;color:var(--dim)}
+.sup-n{font:400 10px var(--disp);color:var(--gold);min-width:36px;text-align:right}
+.sup-n.none{color:var(--dim)}
+.sup-buy{min-height:40px;min-width:70px;padding:6px 10px;font-size:9px}
+.sup-buy.off{opacity:.35}
+.sup-note{font-size:10.5px;color:var(--dim);font-style:italic;margin-top:6px}
+#battle-view .cb-suprow{margin-top:4px}
+#battle-view .cb-sup{font-size:11px;min-height:40px;padding:5px 10px}
+#battle-view .cb-sup .cb-supn{color:var(--gold);font-weight:700;margin-left:3px}
+#battle-view .cb-sup:disabled{opacity:.35}
+
+/* ---- V0.12: legacy (THE TOWER REMEMBERS) ---- */
+.rv-legacy{margin:2px 0 6px;padding:10px 6px;border-top:2px solid var(--gold);border-bottom:2px solid var(--gold)}
+.rvl-kicker{font:400 9px var(--disp);letter-spacing:.26em;color:var(--gold);margin-bottom:6px}
+.rvl-name{font:400 12px var(--disp);color:var(--txt);margin-bottom:4px}
+.rvl-count{font:400 7px var(--disp);letter-spacing:.14em;color:var(--dim);margin-bottom:6px}
+.rvl-quote{font:italic 12.5px var(--body);color:var(--txt);margin-bottom:4px}
+.rvl-scar{font-size:11px;color:var(--dim);font-style:italic}
+.pf-legacy{
+  font:400 7.5px var(--disp);letter-spacing:.12em;color:var(--red);
+  margin-top:6px;padding:6px 8px;border:2px solid rgba(224,82,99,.4);
+}
+.plaque .pl-return{color:var(--red);font-size:10.5px;margin-top:6px;font-style:italic}
+.pf-pact{
+  font:400 7px var(--disp);letter-spacing:.1em;color:var(--red);
+  margin-top:4px;padding:5px 8px;border:2px solid rgba(224,82,99,.55);background:rgba(224,82,99,.06);
+}
+.pf-brand{
+  font:400 7px var(--disp);letter-spacing:.1em;color:var(--gold);
+  margin-top:4px;padding:5px 8px;border:2px solid rgba(232,176,75,.5);background:rgba(232,176,75,.05);
+}
+
+/* ---- V0.16/17: the shell owns the viewport ----
+   body = fixed flex column: header / #app / nav. The lobby is a fixed
+   composition (scene takes ALL remaining space, flex:1); every other
+   screen scrolls INSIDE #app on purpose. No manual px budgeting anywhere. */
+html,body{height:100%}
+body{
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+#hdr{flex:none;position:static}
+#app{
+  flex:1;min-height:0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));
+}
+#app.fixed-page{
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  padding:8px 16px 0;
+}
+#app.fixed-page>*{flex:none}
+#app.fixed-page #lobby-scene{flex:1;min-height:0;margin:2px -16px 0}
+#nav{
+  flex:none;
+  display:flex;gap:0;
+  background:#0d101a;border-top:2px solid #2a3140;
+  padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px));
+}
+#nav button{
+  flex:1;min-height:52px;
+  background:none;border:none;cursor:pointer;
+  color:var(--dim);font:400 7px var(--disp);letter-spacing:.14em;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  -webkit-tap-highlight-color:transparent;
+}
+#nav button::before{content:attr(data-ic);font-size:18px;font-family:system-ui,sans-serif}
+#nav button.on{color:var(--gold)}
+#lobby-scene canvas{display:block;width:100%}
+#lobby-scene .lobby-fabs,#app .lobby-fabs{flex:none}
+.lobby-fabs{display:flex;gap:8px;margin:10px 0 0}
+.lobby-fabs .act{flex:1;min-height:48px;font-size:9px}
+/* roster cards */
+.rgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:4px}
+.rcard{
+  position:relative;background:#11141c;border:2px solid #2a3140;
+  box-shadow:3px 3px 0 rgba(0,0,0,.5);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:12px 8px 10px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.rcard:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(0,0,0,.5)}
+.rcard.inparty{border-color:var(--gold)}
+.rc-party{
+  position:absolute;top:6px;left:6px;
+  font:400 6px var(--disp);letter-spacing:.14em;color:var(--gold);
+  border:1px solid var(--gold);padding:2px 4px;
+}
+.rcard .hero-sprite{--spr-w:72px}
+.rc-name{font:400 8px var(--disp);color:var(--txt);letter-spacing:.04em}
+.rc-meta{font:400 7px var(--disp);color:var(--dim)}
+.rc-meta i{font-style:normal}
+.rc-meta i.r1{color:var(--r1)} .rc-meta i.r2{color:var(--r2)}
+.rc-meta i.r3{color:var(--r3)} .rc-meta i.r4{color:var(--r4)}
+.rc-cond{font-size:10.5px;color:var(--green)}
+.rc-cond.low{color:var(--red)}
+/* summon ceremony */
+.summon{text-align:center;padding:8px 4px}
+.su-kicker{font:400 8px var(--disp);letter-spacing:.3em;color:var(--gold);margin-bottom:14px}
+.su-q{font:700 64px/1 var(--disp);color:var(--txt);text-shadow:0 0 30px rgba(232,176,75,.35);margin-bottom:6px}
+.su-unknown{font:400 11px var(--disp);letter-spacing:.3em;color:var(--dim);margin-bottom:10px}
+.su-tease{font:italic 13px var(--body);color:var(--gold);margin-bottom:16px}
+.su-tease.dim{color:var(--dim)}
+.su-holdwrap{position:relative;display:inline-block;width:220px}
+.su-hold{
+  width:100%;min-height:52px;cursor:pointer;
+  font:400 9px var(--disp);letter-spacing:.2em;color:var(--txt);
+  background:#1b2130;border:2px solid #3a4356;
+  box-shadow:3px 3px 0 rgba(0,0,0,.55);
+}
+.su-holdwrap .su-fill{
+  position:absolute;left:0;top:0;bottom:0;width:0;
+  background:rgba(232,176,75,.25);pointer-events:none;
+}
+/* extraction moment */
+.ex-split{display:flex;gap:10px;margin:10px 0}
+.ex-col{
+  flex:1;padding:10px 8px;border:2px solid #2a3140;
+  display:flex;flex-direction:column;gap:4px;
+}
+.ex-col span{font:400 7px var(--disp);letter-spacing:.2em;color:var(--dim)}
+.ex-col b{font:400 16px var(--disp);color:var(--gold)}
+.ex-col.risk b{color:var(--red)}
+.ex-warn{color:var(--red)!important;font-style:italic}
+
+/* ---- V0.13/15: lobby life (the hall) ---- */
+#hero-drawer{
+  margin:10px 0 2px;padding:10px 12px;
+  background:#11141c;border:2px solid #2a3140;
+  box-shadow:3px 3px 0 rgba(0,0,0,.5);
+}
+#hero-drawer.drawer-hint{
+  color:var(--dim);font-style:italic;font-size:12px;text-align:center;
+  background:none;border:2px dashed #262d3d;box-shadow:none;padding:12px;
+}
+#hero-drawer .hd-main{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+#hero-drawer .hd-name{font:400 9px var(--disp);color:var(--gold);letter-spacing:.06em}
+#hero-drawer .hd-lv{font-size:11px;color:var(--dim)}
+#hero-drawer .hd-rows{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0;font-size:11.5px;color:var(--dim)}
+#hero-drawer .hd-rows b{color:var(--txt);font-weight:700}
+#hero-drawer .hd-rows b.low{color:var(--red)}
+#hero-drawer .hd-act{color:var(--green)!important}
+#hero-drawer .hd-btns{display:flex;gap:8px}
+#hero-drawer .hd-btns .act{flex:1;min-height:40px;font-size:9px}
+
+/* ---- V0.20/21/23: the dungeon room + Scene/Route split ----
+   ONE full-viewport game screen. Budget: status ~44 / scene flex (≈45%) /
+   route ~180 (≈22%) / party ~64 (13%) / actions ~52 (12%). Node content
+   lives INSIDE the scene as a compact overlay — never a stacked section. */
+#app.fixed-page .exp-shell{display:flex;flex-direction:column;height:100%;min-height:0}
+#app.fixed-page .exp-top{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.exp-status{
+  flex:none;display:flex;justify-content:space-between;align-items:center;
+  gap:8px;padding:2px 0 4px;min-height:0;
+}
+.exp-status .exp-kicker{margin:0;white-space:nowrap}
+.exp-status .exp-kicker::after{display:none}
+.exp-status .exp-tally{margin:0;font-size:9px;gap:6px}
+.exp-status .exp-tally .dot{display:none}
+#exp-canvas{flex:1;min-height:120px;margin:2px -16px 0;border-top:2px solid #2a3140;border-bottom:2px solid #2a3140;overflow:hidden}
+#exp-canvas canvas{display:block;width:100%}
+/* the scene overlay: title + narrative + decisions, capped, scrolls itself */
+.dn-title{
+  font:400 9px var(--disp);letter-spacing:.2em;color:var(--gold);
+  text-align:center;margin:8px 0 2px;flex:none;
+}
+#exp-content{flex:none;max-height:42%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.dn-flavor{margin:0 0 6px;font-size:11.5px;text-align:center}
+.dn-idle{margin:6px 0;font-size:11.5px;text-align:center}
+.dn-choices{display:flex;gap:6px;margin:2px 0 4px}
+.dn-choices .act{flex:1;min-height:38px;font-size:8px;padding:6px 8px}
+.dn-walking{
+  flex:1;text-align:center;color:var(--dim);font-style:italic;
+  padding:10px 0;border:2px dashed #262d3d;font-size:11px;
+}
+/* legacy node cards → compact overlays inside the scene pane */
+#exp-content .node-moment{max-width:none;padding:6px 2px 0;animation:none}
+#exp-content .node-icon{font-size:26px;line-height:1;margin-bottom:2px}
+#exp-content .node-icon.fire{animation:none}
+#exp-content .node-title{font-size:9px;letter-spacing:.18em;margin:0}
+#exp-content .node-amount{font-size:18px}
+#exp-content .node-prose{font-size:11.5px;line-height:1.4;max-width:none;margin:4px auto 2px}
+#exp-content .node-quote{font-size:11px;margin:4px auto 2px}
+#exp-content .node-quote.big{font-size:12px;padding:4px 0;margin:4px auto 2px}
+#exp-content .rowbtns{margin:6px 0 2px;gap:6px}
+#exp-content .rowbtns .act{min-height:38px;font-size:8px;padding:6px 8px}
+#exp-content .node-name{font-size:11px;margin:0}
+#exp-content .node-sub{font-size:9px}
+#exp-content .node-gear .ng-row{padding:4px 0;font-size:11px}
+#exp-content .event-scene{min-height:0}
+#exp-content .ev-card{padding:8px}
+#exp-content .ev-title{font-size:11px}
+#exp-content .ev-text{font-size:11.5px;line-height:1.45}
+#exp-content .ev-opt{min-height:40px;padding:6px 10px;font-size:10px}
+#exp-content .ev-sub{font-size:9px}
+#exp-content .exp-kicker{font-size:7px;letter-spacing:.18em;margin:0 0 6px}
+/* route ~22% */
+#app.fixed-page .exp-route{flex:none;height:180px;display:flex;flex-direction:column}
+.route-frame{flex:1;min-height:0;margin:2px 0 0;border-width:0 0 2px 0}
+.route-frame #map-box{height:100%;min-height:0}
+/* the old climb-frame forced a 358px map — the route strip is short */
+.route-frame .it-mapwrap{min-height:0;height:100%;background:transparent;border:none;border-radius:0}
+.route-frame .mapnode{width:34px;height:34px}
+.route-frame .mapnode .ic{font-size:12px}
+.route-frame .mapnode .ic.unknown{font-size:13px}
+.route-frame .mapnode .stars{display:none}
+.exp-route .map-flavor{margin:1px 0 2px;font-size:9.5px}
+/* party 13% + actions 12% */
+.exp-bottom{flex:none}
+.exp-bottom .march-strip{margin:0 0 4px;gap:10px}
+.exp-bottom .march-fig{width:64px;gap:2px}
+.exp-bottom .march-strip .hero-sprite{--spr-w:40px;height:calc(var(--spr-w)*1.3)}
+.exp-bottom .march-name{font-size:7px}
+.exp-bottom .march-hp{height:2px}
+.exp-bottom .map-actions{margin:0 0 2px;gap:6px}
+.exp-bottom .map-actions .act{min-height:40px;font-size:8px;padding:6px 8px}
+
+/* ==== end V0.9.2 pixel pass ==== */

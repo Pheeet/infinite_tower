@@ -1,0 +1,6819 @@
+{
+  "meta": {
+    "format": "infinite-tower-golden/1",
+    "purpose": "Frozen function-level expectations for the Infinite Tower web engine (v0.7), to verify a Godot/GDScript port against.",
+    "engine": {
+      "files": [
+        "js/core.js",
+        "js/combat.js",
+        "js/map.js"
+      ],
+      "sha256_16": {
+        "js/core.js": "a033a59d81a79a5e",
+        "js/combat.js": "42c0011cac104092",
+        "js/map.js": "5dd3aa21126e0f99"
+      }
+    },
+    "rng": {
+      "name": "mulberry32",
+      "impl": "a|=0; a=(a+0x6D2B79F5)|0; t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296",
+      "note": "Each case swaps Math.random for mulberry32(case.seed) and restores it after. The engine has no other nondeterminism on these paths."
+    },
+    "conventions": [
+      "Case shape: {id, category, fn, seed, args, expect, note}. fn names a probe implemented in tests/golden.js; args are JSON-able.",
+      "Comparison is EXACT deep equality on the probe return value (numbers bit-identical; no tolerance).",
+      "Battles run through IT.combat.start(cfg) with FAST=true, headless (no DOM). Battle observables: returned result {win, retreated, deaths}, IT.combat.lastUsage, IT.combat.debug().lines (the rendered log, damage numbers embedded), and live hero objects in IT.S (hp/fear persist).",
+      "dmg entries are parsed log lines formatted \"source>target=amount\". dots = Burn tick amounts per holder. heals = heal amounts per target. match = occurrence counts of note-worthy substrings.",
+      "Engine consumes Math.random in a fixed order per battle (AI jitter first, then variance rolls); reproducing a case means reproducing that call order. Pure-arithmetic cases (rewards, exp, decide scores, makeEnemies, scout) need no RNG at all.",
+      "Test heroes are plain objects built with explicit stats/axes/trait/reaction/skills; test skills are data rows injected into IT.SKILLS using only documented spec fields (power/cd/ai/effects/condition/cost/target/type/executeBonus/prefer).",
+      "Rounding everywhere: Math.round (half-up on positives), damage floors at 1 via max(1, ...).",
+      "Battle cases run with IT.combat.REACTIONS = false (the engine test hook) unless args.reactions is true — the reaction-layer multipliers are stripped so frozen numbers isolate the system under test.",
+      "Regenerate expectations after an intentional rebalance with: node tests/golden.js --update"
+    ],
+    "categories": {
+      "rng": 3,
+      "rawdmg": 8,
+      "effstats": 3,
+      "traits": 15,
+      "barrier_fragile": 6,
+      "executebonus": 3,
+      "heal": 3,
+      "exec_fizzle": 2,
+      "hollow_king": 3,
+      "status_cd": 8,
+      "reactions": 10,
+      "decide": 15,
+      "exp": 5,
+      "rewards": 9,
+      "scout": 1,
+      "enemies": 3,
+      "gacha": 6,
+      "misc": 12
+    }
+  },
+  "cases": [
+    {
+      "id": "rng-001",
+      "category": "rng",
+      "fn": "rnd_seq",
+      "seed": 7,
+      "args": {
+        "a": 0.85,
+        "b": 1.15,
+        "n": 8
+      },
+      "expect": {
+        "rounded": [
+          0.853511,
+          0.868587,
+          1.143072,
+          1.059709,
+          1.006434,
+          0.971657,
+          0.98987,
+          0.921978
+        ]
+      },
+      "note": "IT.rnd(0.85,1.15) = 0.85 + u*(0.30), u = mulberry32 draws. This is the rawDmg variance term v. 8 draws frozen to 1e-6."
+    },
+    {
+      "id": "rng-002",
+      "category": "rng",
+      "fn": "ri_seq",
+      "seed": 5,
+      "args": {
+        "a": 6,
+        "b": 14,
+        "n": 10
+      },
+      "expect": {
+        "values": [
+          12,
+          12,
+          7,
+          11,
+          6,
+          11,
+          12,
+          10,
+          14,
+          8
+        ]
+      },
+      "note": "IT.ri(6,14) = floor(6 + u*9) — the fallen-item stat roller. Bounds 6..14; draws frozen."
+    },
+    {
+      "id": "rng-003",
+      "category": "rng",
+      "fn": "rnd_seq",
+      "seed": 101,
+      "args": {
+        "a": 0,
+        "b": 1,
+        "n": 6
+      },
+      "expect": {
+        "rounded": [
+          0.135648,
+          0.764802,
+          0.540608,
+          0.643016,
+          0.384081,
+          0.693357
+        ]
+      },
+      "note": "Raw mulberry32(seed=101) unit interval draws — the PRNG curve itself. A port must reproduce these exactly to pass any seeded case."
+    },
+    {
+      "id": "rawdmg-001",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 11,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "cls": "Warrior",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 120,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=101",
+          "E1>A=1",
+          "A>E1=101"
+        ],
+        "lastUsage": {
+          "gs": 2
+        },
+        "hpAfter": {
+          "A": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "rawDmg(atk=100, mult=1.0, def=0) = max(1, round(100*v - 0)), v=rnd(0.85,1.15) (2nd Math.random draw: 1st is pickSkill jitter). Enemy hp 120 needs 2 hits."
+    },
+    {
+      "id": "rawdmg-002",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 12,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 60,
+            "atk": 0,
+            "def": 4
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 0.75,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=24",
+          "E1>A=1",
+          "A>E1=23",
+          "E1>A=1",
+          "A>E1=30"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 198
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "mult=0.75 with def 4: round(40*0.75*v - 4*0.6) = round(30v - 2.4). Strike-spec multiplier path."
+    },
+    {
+      "id": "rawdmg-003",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 13,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 5,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 3,
+            "atk": 0,
+            "def": 50
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 0.75,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=1",
+          "E1>A=1",
+          "A>E1=1",
+          "E1>A=1",
+          "A>E1=1"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 98
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "def > atk floor: 5*0.75*v - 50*0.6 is deeply negative -> max(1, ...) = 1 every hit."
+    },
+    {
+      "id": "rawdmg-004",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 14,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 400,
+            "maxHp": 400,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 0,
+            "def": 40
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=74",
+          "E1>A=1",
+          "A>E1=74",
+          "E1>A=1",
+          "A>E1=87",
+          "E1>A=1",
+          "A>E1=61",
+          "E1>A=1",
+          "A>E1=89"
+        ],
+        "lastUsage": {
+          "gs": 5
+        },
+        "hpAfter": {
+          "A": 396
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "heavy def subtraction: round(100v - 24), always >= 61 at v=0.85."
+    },
+    {
+      "id": "rawdmg-005",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 15,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 30,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 100,
+            "atk": 0,
+            "def": 10
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1.4,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=35",
+          "E1>A=1",
+          "A>E1=38",
+          "E1>A=1",
+          "A>E1=34"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 198
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "mult=1.4 (Crushing Blow power): round(42v - 6)."
+    },
+    {
+      "id": "rawdmg-006",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 21,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 400,
+            "atk": 12,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 4,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=98",
+          "E1>A=12",
+          "A>E1=112",
+          "E1>A=12",
+          "A>E1=108",
+          "E1>A=12",
+          "A>E1=95"
+        ],
+        "lastUsage": {
+          "gs": 4
+        },
+        "hpAfter": {
+          "A": 164
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "multi-round variance sequence: damage per round round(100*v_k) plus incoming max(1, round(12*w_k)) until E1 (400hp) dies. Freezes the v-sequence, not just one draw."
+    },
+    {
+      "id": "rawdmg-007",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 1,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 120,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=85",
+          "E1>A=1",
+          "A>E1=93"
+        ],
+        "lastUsage": {
+          "gs": 2
+        },
+        "hpAfter": {
+          "A": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "seed chosen so the first damage draw v sits near its 0.85 lower bound -> dmg near 85 (variance lower extreme)."
+    },
+    {
+      "id": "rawdmg-008",
+      "category": "rawdmg",
+      "fn": "battle",
+      "seed": 37,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 400,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 4,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=115",
+          "E1>A=1",
+          "A>E1=103",
+          "E1>A=1",
+          "A>E1=100",
+          "E1>A=1",
+          "A>E1=107"
+        ],
+        "lastUsage": {
+          "gs": 4
+        },
+        "hpAfter": {
+          "A": 197
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "seed chosen so the first damage draw v sits near its 1.15 upper bound -> dmg near 115 (variance upper extreme)."
+    },
+    {
+      "id": "eff-001",
+      "category": "effstats",
+      "fn": "battle",
+      "seed": 51,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 10,
+            "hp": 120,
+            "maxHp": 120,
+            "skills": [
+              "gcost"
+            ],
+            "items": {
+              "weapon": {
+                "atk": 10
+              },
+              "armor": {
+                "def": 5,
+                "hp": 20
+              },
+              "trinket": {
+                "hp": 30,
+                "atk": 2
+              }
+            }
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gcost": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": {
+              "hpPct": 0.15
+            },
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GCOST"
+          }
+        },
+        "match": [
+          "burns"
+        ]
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=45",
+          "E1>A=1",
+          "A>E1=49",
+          "E1>A=1",
+          "A>E1=59",
+          "E1>A=1",
+          "A>E1=46",
+          "E1>A=1",
+          "A>E1=46"
+        ],
+        "lastUsage": {
+          "gcost": 5
+        },
+        "hpAfter": {
+          "A": 36
+        },
+        "match": {
+          "burns": 5
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "computeEffective: eAtk=round(40+10+2)=52, eDef=15, eMax=120+20+30=170; item hp fills current hp to 170 at battle start. Self-cost skill logs round(eMax*0.15)=26; outgoing hits use eAtk 52."
+    },
+    {
+      "id": "eff-002",
+      "category": "effstats",
+      "fn": "battle",
+      "seed": 51,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 10,
+            "hp": 120,
+            "maxHp": 120,
+            "skills": [
+              "gcost"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gcost": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": {
+              "hpPct": 0.15
+            },
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GCOST"
+          }
+        },
+        "match": [
+          "burns"
+        ]
+      },
+      "expect": {
+        "round": 6,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=35",
+          "E1>A=1",
+          "A>E1=37",
+          "E1>A=1",
+          "A>E1=46",
+          "E1>A=1",
+          "A>E1=35",
+          "E1>A=1",
+          "A>E1=36",
+          "E1>A=1",
+          "A>E1=40"
+        ],
+        "lastUsage": {
+          "gcost": 6
+        },
+        "hpAfter": {
+          "A": 7
+        },
+        "match": {
+          "burns": 6
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "control for eff-001 (no items): cost = round(120*0.15) = 18, damage from atk 40. Same seed -> same v draws."
+    },
+    {
+      "id": "eff-003",
+      "category": "effstats",
+      "fn": "battle",
+      "seed": 52,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 10,
+            "hp": 600,
+            "maxHp": 600,
+            "skills": [
+              "gs"
+            ],
+            "items": {
+              "armor": {
+                "def": 5
+              }
+            }
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 8,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=34",
+          "E1>A=55",
+          "A>E1=40",
+          "E1>A=49",
+          "A>E1=42",
+          "E1>A=52",
+          "A>E1=38",
+          "E1>A=54",
+          "A>E1=41",
+          "E1>A=50",
+          "A>E1=42",
+          "E1>A=45",
+          "A>E1=39",
+          "E1>A=54",
+          "A>E1=37"
+        ],
+        "lastUsage": {
+          "gs": 8
+        },
+        "hpAfter": {
+          "A": 241
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "incoming damage uses eDef: raw=round(60*v), taken=max(1, round(raw - 15*0.6)) with the armor (+5 def); outgoing unchanged at atk 40."
+    },
+    {
+      "id": "trait-001",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 61,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "trait": "irongut",
+            "skills": [
+              "gcost"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gcost": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": {
+              "hpPct": 0.15
+            },
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GCOST"
+          }
+        },
+        "match": [
+          "burns"
+        ]
+      },
+      "expect": {
+        "round": 6,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=42",
+          "E1>A=1",
+          "A>E1=36",
+          "E1>A=1",
+          "A>E1=40",
+          "E1>A=1",
+          "A>E1=39",
+          "E1>A=1",
+          "A>E1=36",
+          "E1>A=1",
+          "A>E1=37"
+        ],
+        "lastUsage": {
+          "gcost": 6
+        },
+        "hpAfter": {
+          "A": 8
+        },
+        "match": {
+          "burns": 6
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "irongut: eMax = round(100*1.15) = 115, current hp raised to 115 at start. Self-cost = round(115*0.15) = 17 (17.25 -> 17). hpAfter shows the 115 pool minus cost/hits."
+    },
+    {
+      "id": "trait-002",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 62,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": "glassedge",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 250,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=105",
+          "E1>A=1",
+          "A>E1=107",
+          "E1>A=1",
+          "A>E1=109"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 198
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "glassedge outgoing: eAtk = round(100*1.15) = 115 -> dmg = round(115*v)."
+    },
+    {
+      "id": "trait-003",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 62,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": null,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 250,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=91",
+          "E1>A=1",
+          "A>E1=93",
+          "E1>A=1",
+          "A>E1=94"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 198
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "control for trait-002 (no trait): dmg = round(100*v). Same seed -> identical v sequence; the ratio to trait-002 isolates the x1.15."
+    },
+    {
+      "id": "trait-004",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 63,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 30,
+            "def": 20,
+            "hp": 600,
+            "maxHp": 600,
+            "trait": "glassedge",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 9,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=31",
+          "E1>A=45",
+          "A>E1=39",
+          "E1>A=52",
+          "A>E1=32",
+          "E1>A=44",
+          "A>E1=39",
+          "E1>A=48",
+          "A>E1=38",
+          "E1>A=44",
+          "A>E1=36",
+          "E1>A=45",
+          "A>E1=30",
+          "E1>A=55",
+          "A>E1=36",
+          "E1>A=49",
+          "A>E1=35"
+        ],
+        "lastUsage": {
+          "gs": 9
+        },
+        "hpAfter": {
+          "A": 218
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "glassedge incoming: eDef = round(20*0.85) = 17 -> taken = max(1, round(60*v - 17*0.6)) = max(1, round(60v - 10.2))."
+    },
+    {
+      "id": "trait-005",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 63,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 30,
+            "def": 20,
+            "hp": 600,
+            "maxHp": 600,
+            "trait": null,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 11,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=26",
+          "E1>A=43",
+          "A>E1=33",
+          "E1>A=50",
+          "A>E1=27",
+          "E1>A=42",
+          "A>E1=34",
+          "E1>A=46",
+          "A>E1=32",
+          "E1>A=42",
+          "A>E1=30",
+          "E1>A=43",
+          "A>E1=26",
+          "E1>A=53",
+          "A>E1=31",
+          "E1>A=47",
+          "A>E1=30",
+          "E1>A=44",
+          "A>E1=30",
+          "E1>A=52",
+          "A>E1=30"
+        ],
+        "lastUsage": {
+          "gs": 11
+        },
+        "hpAfter": {
+          "A": 138
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "control for trait-004: taken = max(1, round(60v - 12)) with def 20."
+    },
+    {
+      "id": "trait-006",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 73,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 400,
+            "maxHp": 400,
+            "trait": "bloodthirst",
+            "skills": [
+              "gbt"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 5,
+            "def": 0
+          },
+          {
+            "name": "E2",
+            "maxHp": 100,
+            "atk": 5,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gbt": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 0.75,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E2=84",
+          "E1>A=5",
+          "E2>A=5",
+          "A>E2=73",
+          "E1>A=5",
+          "A>E1=76",
+          "E1>A=5",
+          "A>E1=73",
+          "E1>A=5",
+          "A>E1=74"
+        ],
+        "lastUsage": {
+          "gbt": 5
+        },
+        "hpAfter": {
+          "A": 375
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "bloodthirst: +10% dmg while any living enemy hp < 30% maxHp. R1 hits E2 (lowest): round(75v) wounds it under 30; R2 escalates to round(75*1.1*v). Later rounds track E1 dropping under 60/200 too."
+    },
+    {
+      "id": "trait-007",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 73,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 400,
+            "maxHp": 400,
+            "trait": null,
+            "skills": [
+              "gbt"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 5,
+            "def": 0
+          },
+          {
+            "name": "E2",
+            "maxHp": 100,
+            "atk": 5,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gbt": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 0.75,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E2=84",
+          "E1>A=5",
+          "E2>A=5",
+          "A>E2=66",
+          "E1>A=5",
+          "A>E1=76",
+          "E1>A=5",
+          "A>E1=73",
+          "E1>A=5",
+          "A>E1=68"
+        ],
+        "lastUsage": {
+          "gbt": 5
+        },
+        "hpAfter": {
+          "A": 375
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "control for trait-006 (no trait): identical targeting/seed, no x1.1 on the wounded-field rounds."
+    },
+    {
+      "id": "trait-008",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 72,
+      "args": {
+        "floor": 11,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": "nighteyes",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=99",
+          "E1>A=1",
+          "A>E1=104"
+        ],
+        "lastUsage": {
+          "gs": 2
+        },
+        "hpAfter": {
+          "A": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "nighteyes on a DARKNESS floor (11): outgoing x1.10 -> round(100*1.1*v) = round(110v). Darkness also multiplies enemy atk by 1.1 at start (0 -> 0 here)."
+    },
+    {
+      "id": "trait-009",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 72,
+      "args": {
+        "floor": 12,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": null,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=90",
+          "E1>A=1",
+          "A>E1=95",
+          "E1>A=1",
+          "A>E1=95"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 198
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "floor-band control: same DARKNESS band (12) without the trait -> plain round(100*v); isolates the nighteyes bonus vs trait-008."
+    },
+    {
+      "id": "trait-010",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 73,
+      "args": {
+        "floor": 14,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": "nighteyes",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=112",
+          "E1>A=1",
+          "A>E1=87",
+          "E1>A=1",
+          "A>E1=94"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 198
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "nighteyes OUTSIDE the 11-13 band (floor 14, BLOOD MOON): no bonus -> round(100*v). Hero kept above 30% hp so Blood Moon never fires."
+    },
+    {
+      "id": "trait-011",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 74,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": "faintheart",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 250,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=96",
+          "E1>A=1",
+          "A>E1=85",
+          "E1>A=1",
+          "A>E1=100"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 198
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "faintheart: -10% dmg dealt -> round(100*0.9*v) = round(90v)."
+    },
+    {
+      "id": "trait-012",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 75,
+      "args": {
+        "reactions": true,
+        "kind": "event",
+        "auto": "retreat",
+        "heroes": [
+          {
+            "name": "A",
+            "courage": 100,
+            "greed": 50,
+            "loyalty": 50,
+            "fear": 0,
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": "faintheart",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 500,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 1,
+        "win": false,
+        "retreated": true,
+        "deaths": [],
+        "dmg": [],
+        "lastUsage": {},
+        "hpAfter": {
+          "A": 200
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 0
+        }
+      },
+      "note": "faintheart withdrawal compliance: decide(retreat) for this hero scores 5 (refuse), but the trait forces compliance -> hero withdraws before round 1 ends, battle result retreated=true, deaths empty."
+    },
+    {
+      "id": "trait-013",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 75,
+      "args": {
+        "reactions": true,
+        "kind": "event",
+        "auto": "retreat",
+        "heroes": [
+          {
+            "name": "A",
+            "courage": 100,
+            "greed": 50,
+            "loyalty": 50,
+            "fear": 0,
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "trait": "irongut",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 60,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 1,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=117"
+        ],
+        "lastUsage": {
+          "gs": 1
+        },
+        "hpAfter": {
+          "A": 230
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 0
+        }
+      },
+      "note": "control for trait-012 (trait without the compliance hook): same refuse-score hero refuses the order, battle continues and is won."
+    },
+    {
+      "id": "trait-014",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 79,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 50,
+            "def": 0,
+            "hp": 400,
+            "maxHp": 400,
+            "fear": 80,
+            "courage": 50,
+            "trait": "coldblood",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 20,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "frozen"
+        ]
+      },
+      "expect": {
+        "round": 9,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=43",
+          "E1>A=20",
+          "A>E1=35",
+          "E1>A=19",
+          "A>E1=35",
+          "E1>A=19",
+          "A>E1=35",
+          "E1>A=21",
+          "A>E1=37",
+          "E1>A=19",
+          "A>E1=41",
+          "E1>A=22",
+          "A>E1=38",
+          "E1>A=22",
+          "A>E1=33",
+          "E1>A=22",
+          "A>E1=41"
+        ],
+        "lastUsage": {
+          "gs": 9
+        },
+        "hpAfter": {
+          "A": 236
+        },
+        "match": {
+          "frozen": 0
+        },
+        "fearAfter": {
+          "A": 80
+        }
+      },
+      "note": "coldblood under PANIC (fear 80 >= 75, courage 50 < 70): the 35% freeze never fires (0 frozen lines) but Panic -25% dmg still applies -> round(50*0.75*v) = round(37.5v)."
+    },
+    {
+      "id": "trait-015",
+      "category": "traits",
+      "fn": "battle",
+      "seed": 79,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 50,
+            "def": 0,
+            "hp": 400,
+            "maxHp": 400,
+            "fear": 80,
+            "courage": 50,
+            "trait": null,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 20,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "frozen"
+        ]
+      },
+      "expect": {
+        "round": 15,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=21",
+          "A>E1=35",
+          "E1>A=19",
+          "E1>A=19",
+          "E1>A=19",
+          "A>E1=39",
+          "E1>A=22",
+          "E1>A=21",
+          "A>E1=42",
+          "E1>A=18",
+          "A>E1=33",
+          "E1>A=22",
+          "E1>A=21",
+          "A>E1=43",
+          "E1>A=22",
+          "A>E1=35",
+          "E1>A=22",
+          "E1>A=19",
+          "E1>A=21",
+          "A>E1=42",
+          "E1>A=22",
+          "A>E1=37"
+        ],
+        "lastUsage": {
+          "gs": 8
+        },
+        "hpAfter": {
+          "A": 112
+        },
+        "match": {
+          "frozen": 7
+        },
+        "fearAfter": {
+          "A": 80
+        }
+      },
+      "note": "control for trait-014, same seed: without coldblood the PANIC freeze lands at least once (a turn with no A attack line)."
+    },
+    {
+      "id": "bar-001",
+      "category": "barrier_fragile",
+      "fn": "battle",
+      "seed": 81,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 60,
+            "def": 0,
+            "hp": 500,
+            "maxHp": 500,
+            "skills": [
+              "gbar",
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 150,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gbar": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "self",
+            "type": "buff",
+            "power": 0,
+            "cd": 3,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "barrier",
+                "dur": 1,
+                "pct": 0.6
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 4,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=24",
+          "A>E1=55",
+          "E1>A=64",
+          "A>E1=56",
+          "E1>A=56",
+          "A>E1=68"
+        ],
+        "lastUsage": {
+          "gbar": 1,
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 356
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "barrier 60% on the round it is applied (dur 1 covers the enemy phase to come): incoming raw = round(60*v*0.4), then def. Round 2 the barrier has decayed -> unreduced. Log tags \"(barrier)\"."
+    },
+    {
+      "id": "bar-002",
+      "category": "barrier_fragile",
+      "fn": "battle",
+      "seed": 82,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 60,
+            "def": 0,
+            "hp": 500,
+            "maxHp": 500,
+            "skills": [
+              "gbar",
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 150,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gbar": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "self",
+            "type": "buff",
+            "power": 0,
+            "cd": 3,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "barrier",
+                "dur": 1,
+                "pct": 1
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 4,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=1",
+          "A>E1=58",
+          "E1>A=59",
+          "A>E1=63",
+          "E1>A=65",
+          "A>E1=65"
+        ],
+        "lastUsage": {
+          "gbar": 1,
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 375
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "100% barrier (Vanish spec): raw reduced to 0, but the final floor max(1, ...) still deals exactly 1. Engine truth: full barrier is not full immunity."
+    },
+    {
+      "id": "bar-003",
+      "category": "barrier_fragile",
+      "fn": "battle",
+      "seed": 83,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 60,
+            "def": 0,
+            "hp": 500,
+            "maxHp": 500,
+            "skills": [
+              "gfrag",
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 150,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gfrag": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "self",
+            "type": "buff",
+            "power": 0,
+            "cd": 3,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "fragile",
+                "dur": 2,
+                "pct": 0.2
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 4,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=73",
+          "A>E1=58",
+          "E1>A=70",
+          "A>E1=67",
+          "E1>A=64",
+          "A>E1=59"
+        ],
+        "lastUsage": {
+          "gfrag": 1,
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 293
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "fragile (Berserk price): taken dmg x1.2 AFTER def subtraction -> round(raw*1.2). Log tags \"(fragile)\"."
+    },
+    {
+      "id": "bar-004",
+      "category": "barrier_fragile",
+      "fn": "battle",
+      "seed": 84,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 60,
+            "def": 0,
+            "hp": 500,
+            "maxHp": 500,
+            "skills": [
+              "gbb",
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 150,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gbb": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "self",
+            "type": "buff",
+            "power": 0,
+            "cd": 3,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "barrier",
+                "dur": 1,
+                "pct": 0.5
+              },
+              {
+                "kind": "fragile",
+                "dur": 2,
+                "pct": 0.2
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 4,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=37",
+          "A>E1=52",
+          "E1>A=68",
+          "A>E1=58",
+          "E1>A=65",
+          "A>E1=61"
+        ],
+        "lastUsage": {
+          "gbb": 1,
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 330
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "barrier + fragile stacked: raw = round(60*v*(1-0.5)), then d = round(raw*(1+0.2)). Both tags appear on the line. Order: barrier first (pre-def), fragile last (post-def)."
+    },
+    {
+      "id": "bar-005",
+      "category": "barrier_fragile",
+      "fn": "battle",
+      "seed": 85,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 300,
+            "maxHp": 300,
+            "skills": [
+              "gdot",
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 5,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gdot": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "self",
+            "type": "buff",
+            "power": 0,
+            "cd": 5,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "burn",
+                "dur": 3,
+                "pct": 0.5
+              },
+              {
+                "kind": "barrier",
+                "dur": 3,
+                "pct": 0.5
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 6,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=3",
+          "A>E1=39",
+          "E1>A=3",
+          "A>E1=44",
+          "E1>A=3",
+          "A>E1=39",
+          "E1>A=5",
+          "A>E1=44",
+          "E1>A=5",
+          "A>E1=42"
+        ],
+        "dots": {
+          "A": [
+            10,
+            10,
+            10
+          ]
+        },
+        "lastUsage": {
+          "gdot": 1,
+          "gs": 5
+        },
+        "hpAfter": {
+          "A": 251
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "DoT through barrier: burn dot = round(eAtk*0.5) = 20, then applyDot = max(1, round(20*0.5)) = 10 per tick. NOTE ENGINE TRUTH: hero-side burn never decays (tickHeroStatuses only decrements non-burn statuses), so it ticks every hero turn until battle end."
+    },
+    {
+      "id": "bar-006",
+      "category": "barrier_fragile",
+      "fn": "battle",
+      "seed": 86,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 300,
+            "maxHp": 300,
+            "skills": [
+              "gdotf",
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 5,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gdotf": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "self",
+            "type": "buff",
+            "power": 0,
+            "cd": 5,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "burn",
+                "dur": 3,
+                "pct": 0.5
+              },
+              {
+                "kind": "fragile",
+                "dur": 3,
+                "pct": 0.2
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 6,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=6",
+          "A>E1=34",
+          "E1>A=6",
+          "A>E1=43",
+          "E1>A=6",
+          "A>E1=38",
+          "E1>A=5",
+          "A>E1=43",
+          "E1>A=5",
+          "A>E1=42"
+        ],
+        "dots": {
+          "A": [
+            24,
+            24,
+            24
+          ]
+        },
+        "lastUsage": {
+          "gdotf": 1,
+          "gs": 5
+        },
+        "hpAfter": {
+          "A": 200
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "DoT through fragile: dot 20 amplified x1.2 -> 24 per tick (no def, no intercepts; hp floors still hold)."
+    },
+    {
+      "id": "exb-001",
+      "category": "executebonus",
+      "fn": "battle",
+      "seed": 91,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gA",
+              "gB"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 120,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gA": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 1,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GA"
+          },
+          "gB": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "executeBonus",
+                "dur": 0,
+                "pct": 0.5
+              }
+            ],
+            "condition": null,
+            "ai": 5,
+            "name": "GB"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=114",
+          "E1>A=1",
+          "A>E1=149"
+        ],
+        "lastUsage": {
+          "gA": 1,
+          "gB": 1
+        },
+        "hpAfter": {
+          "A": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "executeBonus via effects entry: R1 gA (ai 10 beats 5) leaves E1 under 30% of 120 (=36); R2 gA is on cd so gB fires with m = 1.0*(1+0.5) -> round(150*v), killing it."
+    },
+    {
+      "id": "exb-002",
+      "category": "executebonus",
+      "fn": "battle",
+      "seed": 91,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gA",
+              "gB"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 1200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gA": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 1,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GA"
+          },
+          "gB": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "executeBonus",
+                "dur": 0,
+                "pct": 0.5
+              }
+            ],
+            "condition": null,
+            "ai": 5,
+            "name": "GB"
+          }
+        }
+      },
+      "expect": {
+        "round": 12,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=114",
+          "E1>A=1",
+          "A>E1=99",
+          "E1>A=1",
+          "A>E1=92",
+          "E1>A=1",
+          "A>E1=109",
+          "E1>A=1",
+          "A>E1=99",
+          "E1>A=1",
+          "A>E1=100",
+          "E1>A=1",
+          "A>E1=106",
+          "E1>A=1",
+          "A>E1=115",
+          "E1>A=1",
+          "A>E1=93",
+          "E1>A=1",
+          "A>E1=156",
+          "E1>A=1",
+          "A>E1=112",
+          "E1>A=1",
+          "A>E1=165"
+        ],
+        "lastUsage": {
+          "gA": 6,
+          "gB": 6
+        },
+        "hpAfter": {
+          "A": 189
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "executeBonus both regimes in one battle: E1 (1200hp) stays above the 30% line (360) for the first ~9 rounds — gB hits at plain round(100*v); once cumulative damage drops it under 360, gB escalates to round(150*v). Compare early vs late dmg values."
+    },
+    {
+      "id": "exb-003",
+      "category": "executebonus",
+      "fn": "battle",
+      "seed": 91,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 100,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gA",
+              "gB2"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 120,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gA": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 1,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GA"
+          },
+          "gB2": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 5,
+            "name": "GB2",
+            "executeBonus": 0.5
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=114",
+          "E1>A=1",
+          "A>E1=149"
+        ],
+        "lastUsage": {
+          "gA": 1,
+          "gB2": 1
+        },
+        "hpAfter": {
+          "A": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "executeBonus via TOP-LEVEL spec number (the second documented encoding): identical outcome to exb-001 — both encodings must resolve to the same bonus."
+    },
+    {
+      "id": "heal-001",
+      "category": "heal",
+      "fn": "battle",
+      "seed": 101,
+      "args": {
+        "heroes": [
+          {
+            "name": "HL",
+            "cls": "Healer",
+            "atk": 50,
+            "lvl": 3,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "agi": 10,
+            "skills": [
+              "mend"
+            ]
+          },
+          {
+            "name": "B",
+            "cls": "Warrior",
+            "atk": 40,
+            "def": 0,
+            "hp": 30,
+            "maxHp": 200,
+            "agi": 20,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 60,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "B>E1=39",
+          "E1>B=1",
+          "B>E1=41"
+        ],
+        "heals": {
+          "B": [
+            166
+          ]
+        },
+        "lastUsage": {
+          "gs": 2,
+          "mend": 1
+        },
+        "hpAfter": {
+          "HL": 200,
+          "B": 195
+        },
+        "match": {},
+        "fearAfter": {
+          "HL": 15,
+          "B": 15
+        }
+      },
+      "note": "Mend (spec power 1.6): heal = round((18 + eAtk*1.6 + lvl*2) * 1.6) = round((18+80+6)*1.6) = 166. NOTE ENGINE TRUTH: castSkill multiplies the whole base by spec.power, and the base itself already uses the 1.6 atk coefficient — effectively atk*2.56. Frozen as-is."
+    },
+    {
+      "id": "heal-002",
+      "category": "heal",
+      "fn": "battle",
+      "seed": 101,
+      "args": {
+        "heroes": [
+          {
+            "name": "HL",
+            "cls": "Healer",
+            "atk": 50,
+            "lvl": 3,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "agi": 10,
+            "skills": [
+              "mend"
+            ]
+          },
+          {
+            "name": "B",
+            "cls": "Warrior",
+            "atk": 40,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 200,
+            "agi": 20,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 60,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "B>E1=43",
+          "E1>B=1",
+          "B>E1=41"
+        ],
+        "heals": {
+          "B": [
+            100
+          ]
+        },
+        "lastUsage": {
+          "gs": 2,
+          "mend": 1
+        },
+        "hpAfter": {
+          "HL": 200,
+          "B": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "HL": 15,
+          "B": 15
+        }
+      },
+      "note": "Mend cap: heal amount 166 but hp clamped to eMax -> healed = 100 exactly (hp 100 -> 200 of 200)."
+    },
+    {
+      "id": "heal-003",
+      "category": "heal",
+      "fn": "battle",
+      "seed": 102,
+      "args": {
+        "heroes": [
+          {
+            "name": "HL",
+            "cls": "Healer",
+            "atk": 20,
+            "lvl": 10,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "agi": 10,
+            "skills": [
+              "mend"
+            ]
+          },
+          {
+            "name": "B",
+            "cls": "Warrior",
+            "atk": 40,
+            "def": 0,
+            "hp": 10,
+            "maxHp": 300,
+            "agi": 20,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 60,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "B>E1=36",
+          "E1>B=1",
+          "B>E1=38"
+        ],
+        "heals": {
+          "B": [
+            112
+          ]
+        },
+        "lastUsage": {
+          "gs": 2,
+          "mend": 1
+        },
+        "hpAfter": {
+          "HL": 200,
+          "B": 121
+        },
+        "match": {},
+        "fearAfter": {
+          "HL": 15,
+          "B": 15
+        }
+      },
+      "note": "Mend scaling: round((18 + 20*1.6 + 10*2) * 1.6) = round(112) = 112. lvl term is +2/level, uncapped by eMax here."
+    },
+    {
+      "id": "fz-001",
+      "category": "exec_fizzle",
+      "fn": "battle",
+      "seed": 111,
+      "args": {
+        "floor": 10,
+        "floorEnemies": 10,
+        "knowledge": {
+          "executioner": true
+        },
+        "heroes": [
+          {
+            "name": "T",
+            "cls": "Tank",
+            "atk": 180,
+            "def": 200,
+            "hp": 1000,
+            "maxHp": 1000,
+            "agi": 10,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "HL",
+            "cls": "Healer",
+            "atk": 10,
+            "def": 200,
+            "hp": 800,
+            "maxHp": 800,
+            "agi": 11,
+            "skills": [
+              "mend"
+            ]
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "finds no weakness",
+          "MARKED",
+          "EXECUTION"
+        ]
+      },
+      "expect": {
+        "round": 7,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "HL>THE EXECUTIONER 👹=5",
+          "T>THE EXECUTIONER 👹=192",
+          "Cleaver>T=1",
+          "Cleaver>HL=1",
+          "T>THE EXECUTIONER 👹=237",
+          "Creeping dread>T=1",
+          "Creeping dread>HL=1",
+          "T>THE EXECUTIONER 👹=174",
+          "⛓ The axe>T=1",
+          "T>THE EXECUTIONER 👹=175",
+          "Cleaver>T=1",
+          "Cleaver>HL=1",
+          "T>THE EXECUTIONER 👹=166",
+          "Creeping dread>T=1",
+          "Creeping dread>HL=1",
+          "T>THE EXECUTIONER 👹=192",
+          "⛓ The axe>HL=1",
+          "T>THE EXECUTIONER 👹=179"
+        ],
+        "heals": {
+          "HL": [
+            1,
+            1,
+            2,
+            1
+          ],
+          "T": [
+            2,
+            2
+          ]
+        },
+        "lastUsage": {
+          "strike": 1,
+          "gs": 7,
+          "mend": 6
+        },
+        "hpAfter": {
+          "T": 999,
+          "HL": 800
+        },
+        "match": {
+          "finds no weakness": 2,
+          "MARKED": 2,
+          "EXECUTION": 13
+        },
+        "fearAfter": {
+          "T": 25,
+          "HL": 25
+        }
+      },
+      "note": "F10 informed: boss cycle cleave(r1) -> MARK+dread(r2) -> EXECUTION(r3). Def 200 floors every boss hit at max(1,...)=1; Mend (knowExec retarget) tops the marked hero to full eMax before the axe -> execute FIZZLES: \"finds no weakness\" then axe dmg round(55+46*0.5*v) reduced by def. deaths empty. Headless start/mark interrupts resolve to choices[0] (focus/hold)."
+    },
+    {
+      "id": "fz-002",
+      "category": "exec_fizzle",
+      "fn": "battle",
+      "seed": 112,
+      "args": {
+        "floor": 10,
+        "floorEnemies": 10,
+        "heroes": [
+          {
+            "name": "A",
+            "cls": "Tank",
+            "atk": 100,
+            "def": 200,
+            "hp": 600,
+            "maxHp": 600,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "EXECUTION. The axe falls"
+        ]
+      },
+      "expect": {
+        "round": 3,
+        "win": false,
+        "retreated": false,
+        "deaths": [
+          1
+        ],
+        "dmg": [
+          "A>THE EXECUTIONER 👹=125",
+          "Cleaver>A=1",
+          "A>THE EXECUTIONER 👹=112",
+          "Creeping dread>A=1",
+          "A>THE EXECUTIONER 👹=91"
+        ],
+        "lastUsage": {
+          "gs": 3
+        },
+        "hpAfter": {
+          "A": 0
+        },
+        "match": {
+          "EXECUTION. The axe falls": 1
+        },
+        "fearAfter": {
+          "A": 25
+        }
+      },
+      "note": "F10 blind (no knowledge, no healer): marked hero is 2 under max when the axe falls (r1 cleave + r2 dread deal 1 each through def) -> NOT full -> lethal execute: hp forced to 0, deaths [1], loss."
+    },
+    {
+      "id": "hk-001",
+      "category": "hollow_king",
+      "fn": "battle",
+      "seed": 121,
+      "args": {
+        "floor": 20,
+        "floorEnemies": 20,
+        "heroes": [
+          {
+            "name": "L1",
+            "cls": "Warrior",
+            "loyalty": 60,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 12,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "L2",
+            "cls": "Warrior",
+            "loyalty": 80,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 11,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "L3",
+            "cls": "Warrior",
+            "loyalty": 90,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 10,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "DRAIN THE DOUBTFUL",
+          "knows exactly why they climb",
+          "The King drinks"
+        ]
+      },
+      "expect": {
+        "round": 17,
+        "win": true,
+        "retreated": false,
+        "deaths": [
+          1
+        ],
+        "dmg": [
+          "L1>THE HOLLOW KING 👑=78",
+          "L2>THE HOLLOW KING 👑=63",
+          "L3>THE HOLLOW KING 👑=57",
+          "👑 Crown Slash>L1=62",
+          "L1>THE HOLLOW KING 👑=59",
+          "L2>THE HOLLOW KING 👑=61",
+          "L3>THE HOLLOW KING 👑=58",
+          "L1>THE HOLLOW KING 👑=61",
+          "L2>THE HOLLOW KING 👑=53",
+          "L3>THE HOLLOW KING 👑=47",
+          "👑 Drain the Doubtful>L1=57",
+          "Hollow Courtier>L2=25",
+          "L1>THE HOLLOW KING 👑=52",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=53",
+          "👑 Crown Slash>L3=62",
+          "Hollow Courtier>L1=26",
+          "L1>THE HOLLOW KING 👑=58",
+          "L2>THE HOLLOW KING 👑=44",
+          "L3>THE HOLLOW KING 👑=53",
+          "Hollow Courtier>L1=25",
+          "L1>THE HOLLOW KING 👑=53",
+          "L2>THE HOLLOW KING 👑=59",
+          "L3>THE HOLLOW KING 👑=60",
+          "👑 Drain the Doubtful>L1=57",
+          "Hollow Courtier>L1=25",
+          "Hollow Courtier>L3=26",
+          "L1>THE HOLLOW KING 👑=60",
+          "L2>THE HOLLOW KING 👑=48",
+          "L3>THE HOLLOW KING 👑=49",
+          "👑 Crown Slash>L2=62",
+          "Hollow Courtier>L2=28",
+          "Hollow Courtier>L2=25",
+          "L1>THE HOLLOW KING 👑=57",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=55",
+          "👑 Drain the Doubtful>L1=68",
+          "L1>THE HOLLOW KING 👑=56",
+          "L2>THE HOLLOW KING 👑=60",
+          "L3>THE HOLLOW KING 👑=46",
+          "👑 Crown Slash>L1=87",
+          "L1>THE HOLLOW KING 👑=48",
+          "L2>THE HOLLOW KING 👑=54",
+          "L3>THE HOLLOW KING 👑=57",
+          "👑 Drain the Doubtful>L1=68",
+          "L1>THE HOLLOW KING 👑=42",
+          "L2>THE HOLLOW KING 👑=45",
+          "L3>THE HOLLOW KING 👑=56",
+          "👑 Crown Slash>L1=87",
+          "L1>THE HOLLOW KING 👑=42",
+          "L2>THE HOLLOW KING 👑=44",
+          "L3>THE HOLLOW KING 👑=61",
+          "👑 Drain the Doubtful>L1=68",
+          "L1>THE HOLLOW KING 👑=52",
+          "L2>THE HOLLOW KING 👑=48",
+          "L3>THE HOLLOW KING 👑=50",
+          "👑 Crown Slash>L1=87",
+          "L1>THE HOLLOW KING 👑=45",
+          "L2>THE HOLLOW KING 👑=57",
+          "L3>THE HOLLOW KING 👑=59",
+          "👑 Drain the Doubtful>L1=68",
+          "L1>THE HOLLOW KING 👑=47",
+          "L2>THE HOLLOW KING 👑=58",
+          "L3>THE HOLLOW KING 👑=57",
+          "👑 Crown Slash>L1=87",
+          "L1>THE HOLLOW KING 👑=50",
+          "L2>THE HOLLOW KING 👑=46",
+          "L3>THE HOLLOW KING 👑=55",
+          "L2>THE HOLLOW KING 👑=60",
+          "L3>THE HOLLOW KING 👑=55"
+        ],
+        "lastUsage": {
+          "gs": 50
+        },
+        "hpAfter": {
+          "L1": 0,
+          "L2": 760,
+          "L3": 812
+        },
+        "match": {
+          "DRAIN THE DOUBTFUL": 7,
+          "knows exactly why they climb": 7,
+          "The King drinks": 7
+        },
+        "fearAfter": {
+          "L1": 15,
+          "L2": 30,
+          "L3": 30
+        }
+      },
+      "note": "Hollow King cycle slash(r1) -> summon courtier(r2) -> DRAIN(r3, step%3==0): targets lowest-loyalty hero (L1=60); loyalty >= 60 resists -> raw = round(52*2.2*0.5*v) = round(57.2v). King then heals the hp actually drunk."
+    },
+    {
+      "id": "hk-002",
+      "category": "hollow_king",
+      "fn": "battle",
+      "seed": 121,
+      "args": {
+        "floor": 20,
+        "floorEnemies": 20,
+        "heroes": [
+          {
+            "name": "L1",
+            "cls": "Warrior",
+            "loyalty": 40,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 12,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "L2",
+            "cls": "Warrior",
+            "loyalty": 80,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 11,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "L3",
+            "cls": "Warrior",
+            "loyalty": 90,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 10,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "DRAIN THE DOUBTFUL",
+          "least certain",
+          "The King drinks"
+        ]
+      },
+      "expect": {
+        "round": 22,
+        "win": true,
+        "retreated": false,
+        "deaths": [
+          1
+        ],
+        "dmg": [
+          "L1>THE HOLLOW KING 👑=78",
+          "L2>THE HOLLOW KING 👑=63",
+          "L3>THE HOLLOW KING 👑=57",
+          "👑 Crown Slash>L1=62",
+          "L1>THE HOLLOW KING 👑=59",
+          "L2>THE HOLLOW KING 👑=61",
+          "L3>THE HOLLOW KING 👑=58",
+          "L1>THE HOLLOW KING 👑=61",
+          "L2>THE HOLLOW KING 👑=53",
+          "L3>THE HOLLOW KING 👑=47",
+          "👑 Drain the Doubtful>L1=114",
+          "Hollow Courtier>L2=25",
+          "L1>THE HOLLOW KING 👑=52",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=53",
+          "👑 Crown Slash>L3=62",
+          "Hollow Courtier>L1=26",
+          "L1>THE HOLLOW KING 👑=58",
+          "L2>THE HOLLOW KING 👑=44",
+          "L3>THE HOLLOW KING 👑=53",
+          "Hollow Courtier>L1=25",
+          "L1>THE HOLLOW KING 👑=53",
+          "L2>THE HOLLOW KING 👑=59",
+          "L3>THE HOLLOW KING 👑=60",
+          "👑 Drain the Doubtful>L1=114",
+          "Hollow Courtier>L1=25",
+          "Hollow Courtier>L3=26",
+          "L1>THE HOLLOW KING 👑=60",
+          "L2>THE HOLLOW KING 👑=48",
+          "L3>THE HOLLOW KING 👑=49",
+          "👑 Crown Slash>L2=62",
+          "Hollow Courtier>L2=28",
+          "Hollow Courtier>L2=25",
+          "L1>THE HOLLOW KING 👑=57",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=55",
+          "👑 Crown Slash>L2=62",
+          "Hollow Courtier>L3=29",
+          "Hollow Courtier>L3=24",
+          "L1>THE HOLLOW KING 👑=47",
+          "L2>THE HOLLOW KING 👑=48",
+          "L3>THE HOLLOW KING 👑=54",
+          "👑 Crown Slash>L2=87",
+          "L1>THE HOLLOW KING 👑=59",
+          "L2>THE HOLLOW KING 👑=49",
+          "L3>THE HOLLOW KING 👑=46",
+          "👑 Drain the Doubtful>L1=136",
+          "L1>THE HOLLOW KING 👑=41",
+          "L2>THE HOLLOW KING 👑=47",
+          "L3>THE HOLLOW KING 👑=44",
+          "👑 Crown Slash>L2=87",
+          "L1>THE HOLLOW KING 👑=46",
+          "L2>THE HOLLOW KING 👑=46",
+          "L3>THE HOLLOW KING 👑=59",
+          "👑 Drain the Doubtful>L1=136",
+          "L1>THE HOLLOW KING 👑=41",
+          "L2>THE HOLLOW KING 👑=51",
+          "L3>THE HOLLOW KING 👑=57",
+          "👑 Crown Slash>L3=87",
+          "L1>THE HOLLOW KING 👑=51",
+          "L2>THE HOLLOW KING 👑=46",
+          "L3>THE HOLLOW KING 👑=46",
+          "👑 Drain the Doubtful>L1=136",
+          "L1>THE HOLLOW KING 👑=43",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=46",
+          "👑 Crown Slash>L3=87",
+          "L1>THE HOLLOW KING 👑=48",
+          "L2>THE HOLLOW KING 👑=57",
+          "L3>THE HOLLOW KING 👑=57",
+          "L2>THE HOLLOW KING 👑=51",
+          "L3>THE HOLLOW KING 👑=69",
+          "👑 Crown Slash>L3=87",
+          "L2>THE HOLLOW KING 👑=57",
+          "L3>THE HOLLOW KING 👑=68",
+          "👑 Drain the Doubtful>L2=68",
+          "L2>THE HOLLOW KING 👑=45",
+          "L3>THE HOLLOW KING 👑=70",
+          "👑 Crown Slash>L2=87",
+          "L2>THE HOLLOW KING 👑=44",
+          "L3>THE HOLLOW KING 👑=69",
+          "👑 Drain the Doubtful>L2=68",
+          "L2>THE HOLLOW KING 👑=53",
+          "L3>THE HOLLOW KING 👑=68",
+          "👑 Crown Slash>L3=87",
+          "L2>THE HOLLOW KING 👑=42"
+        ],
+        "lastUsage": {
+          "gs": 59
+        },
+        "hpAfter": {
+          "L1": 0,
+          "L2": 301,
+          "L3": 411
+        },
+        "match": {
+          "DRAIN THE DOUBTFUL": 8,
+          "least certain": 6,
+          "The King drinks": 8
+        },
+        "fearAfter": {
+          "L1": 15,
+          "L2": 30,
+          "L3": 30
+        }
+      },
+      "note": "same setup, least-loyal hero at 40: NO resist -> raw = round(52*2.2*v) = round(114.4v), exactly double the resisted roll at equal v (modulo rounding)."
+    },
+    {
+      "id": "hk-003",
+      "category": "hollow_king",
+      "fn": "battle",
+      "seed": 121,
+      "args": {
+        "floor": 20,
+        "floorEnemies": 20,
+        "heroes": [
+          {
+            "name": "L1",
+            "cls": "Warrior",
+            "loyalty": 59,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 12,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "L2",
+            "cls": "Warrior",
+            "loyalty": 80,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 11,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "L3",
+            "cls": "Warrior",
+            "loyalty": 90,
+            "atk": 60,
+            "def": 0,
+            "hp": 900,
+            "maxHp": 900,
+            "agi": 10,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "DRAIN THE DOUBTFUL",
+          "least certain"
+        ]
+      },
+      "expect": {
+        "round": 22,
+        "win": true,
+        "retreated": false,
+        "deaths": [
+          1
+        ],
+        "dmg": [
+          "L1>THE HOLLOW KING 👑=78",
+          "L2>THE HOLLOW KING 👑=63",
+          "L3>THE HOLLOW KING 👑=57",
+          "👑 Crown Slash>L1=62",
+          "L1>THE HOLLOW KING 👑=59",
+          "L2>THE HOLLOW KING 👑=61",
+          "L3>THE HOLLOW KING 👑=58",
+          "L1>THE HOLLOW KING 👑=61",
+          "L2>THE HOLLOW KING 👑=53",
+          "L3>THE HOLLOW KING 👑=47",
+          "👑 Drain the Doubtful>L1=114",
+          "Hollow Courtier>L2=25",
+          "L1>THE HOLLOW KING 👑=52",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=53",
+          "👑 Crown Slash>L3=62",
+          "Hollow Courtier>L1=26",
+          "L1>THE HOLLOW KING 👑=58",
+          "L2>THE HOLLOW KING 👑=44",
+          "L3>THE HOLLOW KING 👑=53",
+          "Hollow Courtier>L1=25",
+          "L1>THE HOLLOW KING 👑=53",
+          "L2>THE HOLLOW KING 👑=59",
+          "L3>THE HOLLOW KING 👑=60",
+          "👑 Drain the Doubtful>L1=114",
+          "Hollow Courtier>L1=25",
+          "Hollow Courtier>L3=26",
+          "L1>THE HOLLOW KING 👑=60",
+          "L2>THE HOLLOW KING 👑=48",
+          "L3>THE HOLLOW KING 👑=49",
+          "👑 Crown Slash>L2=62",
+          "Hollow Courtier>L2=28",
+          "Hollow Courtier>L2=25",
+          "L1>THE HOLLOW KING 👑=57",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=55",
+          "👑 Crown Slash>L2=62",
+          "Hollow Courtier>L3=29",
+          "Hollow Courtier>L3=24",
+          "L1>THE HOLLOW KING 👑=47",
+          "L2>THE HOLLOW KING 👑=48",
+          "L3>THE HOLLOW KING 👑=54",
+          "👑 Crown Slash>L2=87",
+          "L1>THE HOLLOW KING 👑=59",
+          "L2>THE HOLLOW KING 👑=49",
+          "L3>THE HOLLOW KING 👑=46",
+          "👑 Drain the Doubtful>L1=136",
+          "L1>THE HOLLOW KING 👑=41",
+          "L2>THE HOLLOW KING 👑=47",
+          "L3>THE HOLLOW KING 👑=44",
+          "👑 Crown Slash>L2=87",
+          "L1>THE HOLLOW KING 👑=46",
+          "L2>THE HOLLOW KING 👑=46",
+          "L3>THE HOLLOW KING 👑=59",
+          "👑 Drain the Doubtful>L1=136",
+          "L1>THE HOLLOW KING 👑=41",
+          "L2>THE HOLLOW KING 👑=51",
+          "L3>THE HOLLOW KING 👑=57",
+          "👑 Crown Slash>L3=87",
+          "L1>THE HOLLOW KING 👑=51",
+          "L2>THE HOLLOW KING 👑=46",
+          "L3>THE HOLLOW KING 👑=46",
+          "👑 Drain the Doubtful>L1=136",
+          "L1>THE HOLLOW KING 👑=43",
+          "L2>THE HOLLOW KING 👑=56",
+          "L3>THE HOLLOW KING 👑=46",
+          "👑 Crown Slash>L3=87",
+          "L1>THE HOLLOW KING 👑=48",
+          "L2>THE HOLLOW KING 👑=57",
+          "L3>THE HOLLOW KING 👑=57",
+          "L2>THE HOLLOW KING 👑=51",
+          "L3>THE HOLLOW KING 👑=69",
+          "👑 Crown Slash>L3=87",
+          "L2>THE HOLLOW KING 👑=57",
+          "L3>THE HOLLOW KING 👑=68",
+          "👑 Drain the Doubtful>L2=68",
+          "L2>THE HOLLOW KING 👑=45",
+          "L3>THE HOLLOW KING 👑=70",
+          "👑 Crown Slash>L2=87",
+          "L2>THE HOLLOW KING 👑=44",
+          "L3>THE HOLLOW KING 👑=69",
+          "👑 Drain the Doubtful>L2=68",
+          "L2>THE HOLLOW KING 👑=53",
+          "L3>THE HOLLOW KING 👑=68",
+          "👑 Crown Slash>L3=87",
+          "L2>THE HOLLOW KING 👑=42"
+        ],
+        "lastUsage": {
+          "gs": 59
+        },
+        "hpAfter": {
+          "L1": 0,
+          "L2": 301,
+          "L3": 411
+        },
+        "match": {
+          "DRAIN THE DOUBTFUL": 8,
+          "least certain": 6
+        },
+        "fearAfter": {
+          "L1": 15,
+          "L2": 30,
+          "L3": 30
+        }
+      },
+      "note": "boundary: loyalty 59 is one under the resist line — full-power drain. Pairs with hk-001 (60 = halved) to pin the >= 60 comparison."
+    },
+    {
+      "id": "cd-001",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 131,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 20,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 100,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=23",
+          "E1>A=1",
+          "A>E1=22",
+          "E1>A=1",
+          "A>E1=22",
+          "E1>A=1",
+          "A>E1=19",
+          "E1>A=1",
+          "A>E1=20"
+        ],
+        "lastUsage": {
+          "gs": 5
+        },
+        "hpAfter": {
+          "A": 96
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "cd 0 = spammable: castable every hero turn; lastUsage counts gs == number of hero turns fought (strike fallback never needed)."
+    },
+    {
+      "id": "cd-002",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 131,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 20,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 100,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 1,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 6,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=23",
+          "E1>A=1",
+          "A>E1=14",
+          "E1>A=1",
+          "A>E1=18",
+          "E1>A=1",
+          "A>E1=16",
+          "E1>A=1",
+          "A>E1=21",
+          "E1>A=1",
+          "A>E1=14"
+        ],
+        "lastUsage": {
+          "gs": 3,
+          "strike": 3
+        },
+        "hpAfter": {
+          "A": 95
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "cd 1 locks exactly 1 turn: cast r1, strike r2, cast r3, strike r4... Engine sets cds=cd+1 on cast and decrements at every turn START (so ready again after exactly cd locked turns)."
+    },
+    {
+      "id": "cd-003",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 131,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 20,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 100,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 2,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 6,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=23",
+          "E1>A=1",
+          "A>E1=14",
+          "E1>A=1",
+          "A>E1=14",
+          "E1>A=1",
+          "A>E1=21",
+          "E1>A=1",
+          "A>E1=16",
+          "E1>A=1",
+          "A>E1=15"
+        ],
+        "lastUsage": {
+          "gs": 2,
+          "strike": 4
+        },
+        "hpAfter": {
+          "A": 95
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "cd 2 locks exactly 2 turns: cast r1, strike r2+r3, cast r4... (Fireball/Meteor cadence)."
+    },
+    {
+      "id": "cd-004",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 131,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 20,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 100,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 3,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 6,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=23",
+          "E1>A=1",
+          "A>E1=14",
+          "E1>A=1",
+          "A>E1=14",
+          "E1>A=1",
+          "A>E1=13",
+          "E1>A=1",
+          "A>E1=21",
+          "E1>A=1",
+          "A>E1=15"
+        ],
+        "lastUsage": {
+          "gs": 2,
+          "strike": 4
+        },
+        "hpAfter": {
+          "A": 95
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "cd 3 (Crushing Blow/Poisoned Blade cadence): cast r1, strike r2-r4, cast r5."
+    },
+    {
+      "id": "burn-001",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 132,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 20,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gsburn"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 150,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gsburn": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "burn",
+                "dur": 2,
+                "pct": 0.3
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=20",
+          "E1>A=1",
+          "A>E1=23",
+          "E1>A=1",
+          "A>E1=22",
+          "E1>A=1",
+          "A>E1=21",
+          "E1>A=1",
+          "A>E1=20"
+        ],
+        "dots": {
+          "E1": [
+            6,
+            6,
+            6,
+            6,
+            6,
+            6,
+            6,
+            6
+          ]
+        },
+        "lastUsage": {
+          "gsburn": 5
+        },
+        "hpAfter": {
+          "A": 196
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "enemy-side burn: dot = round(eAtk*0.3) = 6 (RNG-free), ticks at the ENEMY turn start, dur decrements every enemy turn (burn included). cd 0 recasts stack: r2+ shows one line per stacked burn. dots.E1 sequence frozen."
+    },
+    {
+      "id": "buff-001",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 133,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 90,
+            "def": 0,
+            "hp": 300,
+            "maxHp": 300,
+            "skills": [
+              "gw",
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gw": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "party",
+            "type": "buff",
+            "power": 0,
+            "cd": 4,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "atkup",
+                "dur": 2,
+                "pct": 0.15
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=1",
+          "A>E1=105",
+          "E1>A=1",
+          "A>E1=77",
+          "E1>A=1",
+          "A>E1=84",
+          "E1>A=1",
+          "A>E1=95"
+        ],
+        "lastUsage": {
+          "gw": 1,
+          "gs": 4
+        },
+        "hpAfter": {
+          "A": 296
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "atkup decay: applied r1 (no attack that turn — War Cry is a pure buff), active on r2 hit (x1.15: round(90*1.15*v)), decayed to 0 at the r3 turn start -> r3 hit unboosted. Same-round application never decays on the caster same turn."
+    },
+    {
+      "id": "taunt-001",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 134,
+      "args": {
+        "heroes": [
+          {
+            "name": "T",
+            "cls": "Tank",
+            "atk": 40,
+            "def": 0,
+            "hp": 500,
+            "maxHp": 500,
+            "agi": 20,
+            "skills": [
+              "gt",
+              "gs"
+            ]
+          },
+          {
+            "name": "A",
+            "cls": "Mage",
+            "atk": 40,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "agi": 10,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 80,
+            "atk": 40,
+            "def": 0
+          },
+          {
+            "name": "E2",
+            "maxHp": 80,
+            "atk": 40,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gt": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "self",
+            "type": "protect",
+            "power": 0,
+            "cd": 4,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "taunt",
+                "dur": 2,
+                "pct": 1
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GB"
+          },
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 1,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=44",
+          "E1>T=43",
+          "E2>T=37",
+          "T>E1=40",
+          "A>E2=44",
+          "E2>T=39",
+          "T>E2=43"
+        ],
+        "lastUsage": {
+          "gt": 1,
+          "gs": 4
+        },
+        "hpAfter": {
+          "T": 381,
+          "A": 100
+        },
+        "match": {},
+        "fearAfter": {
+          "T": 15,
+          "A": 15
+        }
+      },
+      "note": "taunt: every enemy attack line targets the taunt holder T while the status lives (dur 2), overriding the v0.2 tank-bias/pick targeting. All dmg lines read E*>T=..."
+    },
+    {
+      "id": "stun-001",
+      "category": "status_cd",
+      "fn": "battle",
+      "seed": 135,
+      "args": {
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "skills": [
+              "gstun"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 150,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gstun": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [
+              {
+                "kind": "stun",
+                "dur": 1,
+                "chance": 1
+              }
+            ],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "reels"
+        ]
+      },
+      "expect": {
+        "round": 4,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=43",
+          "A>E1=34",
+          "A>E1=44",
+          "A>E1=37"
+        ],
+        "lastUsage": {
+          "gstun": 4
+        },
+        "hpAfter": {
+          "A": 200
+        },
+        "match": {
+          "reels": 3
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "stun (chance 1): enemy skips its turn every round (\"reels — stunned\"), taking one stun line per enemy turn until death. Hero takes zero damage — dmg has only A>E1 lines."
+    },
+    {
+      "id": "rx-001",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 142,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 30,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "reaction": "killer",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 35,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=31",
+          "E1>A=1",
+          "A>E1=41"
+        ],
+        "lastUsage": {
+          "gs": 2
+        },
+        "hpAfter": {
+          "A": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "killer instinct: r1 leaves E1 under 15% of 35 (=5.25); r2 multiplies m by 1.5 -> round(30*1.5*v) = round(45v). Seed chosen so r1 damage >= 30."
+    },
+    {
+      "id": "rx-002",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 142,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 30,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "reaction": "steady",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 35,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        }
+      },
+      "expect": {
+        "round": 2,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=33",
+          "E1>A=1",
+          "A>E1=29"
+        ],
+        "lastUsage": {
+          "gs": 2
+        },
+        "hpAfter": {
+          "A": 199
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "steady control: every hit x1.05 -> round(31.5*v); no escalation on the wounded round. Same seed as rx-001."
+    },
+    {
+      "id": "rx-003",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 142,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "LS",
+            "atk": 30,
+            "def": 0,
+            "hp": 10,
+            "maxHp": 100,
+            "courage": 90,
+            "agi": 20,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "W",
+            "atk": 30,
+            "def": 0,
+            "hp": 20,
+            "maxHp": 100,
+            "courage": 50,
+            "agi": 10,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 50,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "LAST STAND"
+        ]
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "LS>E1=67",
+          "W>E1=31",
+          "E1>LS=47",
+          "LS>E1=69",
+          "W>E1=31",
+          "E1>LS=54",
+          "LS>E1=49"
+        ],
+        "lastUsage": {
+          "gs": 5
+        },
+        "hpAfter": {
+          "LS": 1,
+          "W": 20
+        },
+        "match": {
+          "LAST STAND": 1
+        },
+        "fearAfter": {
+          "LS": 15,
+          "W": 15
+        }
+      },
+      "note": "Last Stand (courage 90 >= 85, hp 10 < 15%, ally 20 < 25%): triggers once; stander intercepts ALL enemy damage and floors at hp 1 (hpAfter.LS ends 1 while surviving), outgoing x1.5, 2 rounds."
+    },
+    {
+      "id": "rx-004",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 144,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 30,
+            "def": 0,
+            "hp": 15,
+            "maxHp": 100,
+            "reaction": "cowardretreat",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "slips out"
+        ]
+      },
+      "expect": {
+        "round": 1,
+        "win": false,
+        "retreated": true,
+        "deaths": [],
+        "dmg": [],
+        "lastUsage": {},
+        "hpAfter": {
+          "A": 15
+        },
+        "match": {
+          "slips out": 0
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "Coward's Retreat: hp 15 < 20% of eMax -> 40%/turn slip-out roll happens BEFORE acting. Seed chosen so the r1 roll fires: hero withdraws keeping 15hp, single-hero party -> battle ends retreated."
+    },
+    {
+      "id": "rx-005",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 141,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 30,
+            "def": 0,
+            "hp": 15,
+            "maxHp": 100,
+            "reaction": "cowardretreat",
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 20,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "slips out"
+        ]
+      },
+      "expect": {
+        "round": 1,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=25"
+        ],
+        "lastUsage": {
+          "gs": 1
+        },
+        "hpAfter": {
+          "A": 15
+        },
+        "match": {
+          "slips out": 0
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "Coward Retreat roll fails (seed chosen so u >= 0.40 on r1): hero attacks instead, kills E1 (20hp) before another roll — win, no withdrawal."
+    },
+    {
+      "id": "loy-001",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 146,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "loyalty": 20,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "refuses the order"
+        ]
+      },
+      "expect": {
+        "round": 7,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "E1>A=1",
+          "A>E1=43",
+          "E1>A=1",
+          "A>E1=44",
+          "E1>A=1",
+          "A>E1=37",
+          "E1>A=1",
+          "A>E1=47",
+          "E1>A=1",
+          "E1>A=1",
+          "A>E1=47"
+        ],
+        "lastUsage": {
+          "gs": 5
+        },
+        "hpAfter": {
+          "A": 194
+        },
+        "match": {
+          "refuses the order": 2
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "in-battle loyalty gate: loyalty 20 < 30 -> 20% per turn to refuse (\"refuses the order\"), losing the turn. Seed chosen for at least one refusal; fewer A>E1 dmg lines than rounds fought."
+    },
+    {
+      "id": "loy-002",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 146,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 200,
+            "maxHp": 200,
+            "loyalty": 50,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "refuses the order"
+        ]
+      },
+      "expect": {
+        "round": 5,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=37",
+          "E1>A=1",
+          "A>E1=43",
+          "E1>A=1",
+          "A>E1=47",
+          "E1>A=1",
+          "A>E1=46",
+          "E1>A=1",
+          "A>E1=37"
+        ],
+        "lastUsage": {
+          "gs": 5
+        },
+        "hpAfter": {
+          "A": 196
+        },
+        "match": {
+          "refuses the order": 0
+        },
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "control: loyalty 50 never gated — 0 refusal lines, one dmg line per hero turn."
+    },
+    {
+      "id": "mc-001",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 146,
+      "args": {
+        "reactions": true,
+        "autoCmd": "overdrive",
+        "heroes": [
+          {
+            "name": "A",
+            "atk": 40,
+            "def": 0,
+            "hp": 300,
+            "maxHp": 300,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 0,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "OVERDRIVE"
+        ]
+      },
+      "expect": {
+        "round": 7,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=46",
+          "E1>A=1",
+          "A>E1=54",
+          "E1>A=1",
+          "A>E1=47",
+          "E1>A=1",
+          "A>E1=46",
+          "E1>A=1",
+          "A>E1=37",
+          "E1>A=1",
+          "A>E1=48",
+          "E1>A=1",
+          "A>E1=47"
+        ],
+        "lastUsage": {
+          "gs": 7
+        },
+        "hpAfter": {
+          "A": 294
+        },
+        "match": {
+          "OVERDRIVE": 1
+        },
+        "fearAfter": {
+          "A": 30
+        }
+      },
+      "note": "OVERDRIVE master command (once per battle): m x1.25 on rounds 1-2, burns off at end of r2 and adds fear +15 (fearAfter). r3+ damage back to x1.05 steady baseline."
+    },
+    {
+      "id": "mc-002",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 147,
+      "args": {
+        "reactions": true,
+        "autoCmd": "protect:1",
+        "heroes": [
+          {
+            "name": "P1",
+            "cls": "Tank",
+            "atk": 40,
+            "def": 30,
+            "hp": 500,
+            "maxHp": 500,
+            "agi": 20,
+            "skills": [
+              "gs"
+            ]
+          },
+          {
+            "name": "P2",
+            "cls": "Mage",
+            "atk": 40,
+            "def": 0,
+            "hp": 100,
+            "maxHp": 100,
+            "agi": 10,
+            "skills": [
+              "gs"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 200,
+            "atk": 60,
+            "def": 0
+          }
+        ],
+        "customSkills": {
+          "gs": {
+            "cls": "*",
+            "tier": "basic",
+            "target": "enemy",
+            "type": "attack",
+            "power": 1,
+            "cd": 0,
+            "cost": null,
+            "effects": [],
+            "condition": null,
+            "ai": 10,
+            "name": "GS"
+          }
+        },
+        "match": [
+          "holds the line"
+        ]
+      },
+      "expect": {
+        "round": 3,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "P1>E1=38",
+          "P2>E1=42",
+          "E1>P1=42",
+          "P1>E1=44",
+          "P2>E1=42",
+          "E1>P1=38",
+          "P1>E1=38"
+        ],
+        "lastUsage": {
+          "gs": 5
+        },
+        "hpAfter": {
+          "P1": 420,
+          "P2": 100
+        },
+        "match": {
+          "holds the line": 1
+        },
+        "fearAfter": {
+          "P1": 15,
+          "P2": 15
+        }
+      },
+      "note": "PROTECT master command (2 rounds): every enemy blow is retargeted to the protector at FULL value with the protector def applying (taken = max(1, round(60v - 30*0.6))). All enemy dmg lines read E1>P1=..."
+    },
+    {
+      "id": "legacy-001",
+      "category": "reactions",
+      "fn": "battle",
+      "seed": 148,
+      "args": {
+        "reactions": true,
+        "heroes": [
+          {
+            "name": "A",
+            "cls": "Warrior",
+            "atk": 40,
+            "def": 0,
+            "hp": 300,
+            "maxHp": 300,
+            "skills": [
+              "strike"
+            ]
+          }
+        ],
+        "enemies": [
+          {
+            "name": "E1",
+            "maxHp": 300,
+            "atk": 0,
+            "def": 0
+          }
+        ]
+      },
+      "expect": {
+        "round": 7,
+        "win": true,
+        "retreated": false,
+        "deaths": [],
+        "dmg": [
+          "A>E1=43",
+          "E1>A=1",
+          "A>E1=43",
+          "E1>A=1",
+          "A>E1=36",
+          "E1>A=1",
+          "A>Power Strike E1=75",
+          "E1>A=1",
+          "A>E1=37",
+          "E1>A=1",
+          "A>E1=36",
+          "E1>A=1",
+          "A>Power Strike E1=84"
+        ],
+        "lastUsage": {},
+        "hpAfter": {
+          "A": 294
+        },
+        "match": {},
+        "fearAfter": {
+          "A": 15
+        }
+      },
+      "note": "legacy fallback path: skills resolving to nothing but strike -> kitFor returns null -> v0.2 hardcoded Warrior act (30% Power Strike x1.8, else x1.0). Freeze so un-migrated saves keep exact behavior."
+    },
+    {
+      "id": "decide-001",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 60,
+          "greed": 40,
+          "loyalty": 55,
+          "fear": 20
+        },
+        "action": "open_chest",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 74
+      },
+      "note": "score = round(clamp(50 + Σ axis*weight, 0, 100)); open_chest: +0.2c +0.5g -0.4f = 50+12+20-8 = 74 -> comply (>=60)."
+    },
+    {
+      "id": "decide-002",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 60,
+          "greed": 40,
+          "loyalty": 55,
+          "fear": 20
+        },
+        "action": "investigate",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 72
+      },
+      "note": "investigate: +0.4c +0.2g -0.5f = 50+24+8-10 = 72 -> comply."
+    },
+    {
+      "id": "decide-003",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 60,
+          "greed": 40,
+          "loyalty": 55,
+          "fear": 20
+        },
+        "action": "help_stranger",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 75
+      },
+      "note": "help_stranger: +0.4c -0.3g +0.3l -0.2f = 50+24-12+16.5-4 = 74.5 -> Math.round after clamp -> 75 -> comply."
+    },
+    {
+      "id": "decide-004",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 60,
+          "greed": 40,
+          "loyalty": 55,
+          "fear": 20
+        },
+        "action": "rob_stranger",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "refuse",
+        "score": 37
+      },
+      "note": "rob_stranger: +0.5g -0.6l = 50+20-33 = 37 -> refuse (<40)."
+    },
+    {
+      "id": "decide-005",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 60,
+          "greed": 40,
+          "loyalty": 55,
+          "fear": 20
+        },
+        "action": "retreat",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "refuse",
+        "score": 34
+      },
+      "note": "retreat: -0.5c +0.1l +0.4f = 50-30+5.5+8 = 33.5 -> 34 round -> refuse. This is the same table decideRetreat uses in combat."
+    },
+    {
+      "id": "decide-006",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 60,
+          "greed": 40,
+          "loyalty": 55,
+          "fear": 20
+        },
+        "action": "sacrifice",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 96
+      },
+      "note": "sacrifice: +0.4c +0.5l -0.3f = 50+24+27.5-6 = 95.5 -> 96 round -> comply."
+    },
+    {
+      "id": "decide-007",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 60,
+          "greed": 40,
+          "loyalty": 55,
+          "fear": 20
+        },
+        "action": "push_on",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 70
+      },
+      "note": "push_on: +0.4c +0.1g -0.4f = 50+24+4-8 = 70 -> comply."
+    },
+    {
+      "id": "decide-008",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 100,
+          "greed": 100,
+          "loyalty": 50,
+          "fear": 0
+        },
+        "action": "open_chest",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 100
+      },
+      "note": "upper clamp: raw score 120 -> clamped 100 before round -> 100, comply."
+    },
+    {
+      "id": "decide-009",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 0,
+          "greed": 0,
+          "loyalty": 0,
+          "fear": 100
+        },
+        "action": "investigate",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "refuse",
+        "score": 0
+      },
+      "note": "lower clamp: raw 50-50 = 0 -> refuse."
+    },
+    {
+      "id": "decide-010",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 20,
+          "greed": 50,
+          "loyalty": 50,
+          "fear": 40
+        },
+        "action": "retreat",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 61
+      },
+      "note": "verdict band edges: score 50-10+5+16 = 61 -> comply; retreat score of exactly 60 is the band line (>=60 comply, 40-59 grudging, <40 refuse)."
+    },
+    {
+      "id": "decide-011",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 40,
+          "greed": 50,
+          "loyalty": 50,
+          "fear": 25
+        },
+        "action": "retreat",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "grudging",
+        "score": 45
+      },
+      "note": "mid band: 50-20+5+10 = 45 -> grudging."
+    },
+    {
+      "id": "decide-012",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 197,
+      "args": {
+        "hero": {
+          "courage": 90,
+          "greed": 50,
+          "loyalty": 10,
+          "fear": 5
+        },
+        "action": "open_chest",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "refuse",
+        "score": 91
+      },
+      "note": "loyalty gate: loyalty 10 < 25 and action != retreat -> 30% flat-refuse override (verdict refuse + disloyal line pool). Seed chosen so the gate roll fires; score itself is ungated (91 -> comply without the gate)."
+    },
+    {
+      "id": "decide-013",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 201,
+      "args": {
+        "hero": {
+          "courage": 90,
+          "greed": 50,
+          "loyalty": 10,
+          "fear": 5
+        },
+        "action": "open_chest",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "comply",
+        "score": 91
+      },
+      "note": "gate does NOT fire (seed roll u >= 0.30): verdict follows the score -> comply."
+    },
+    {
+      "id": "decide-014",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 201,
+      "args": {
+        "hero": {
+          "courage": 20,
+          "greed": 0,
+          "loyalty": 100,
+          "fear": 20
+        },
+        "action": "rob_stranger",
+        "ctx": {
+          "alt": true
+        }
+      },
+      "expect": {
+        "verdict": "alt",
+        "score": 0
+      },
+      "note": "alt branch: rob_stranger for this hero scores 50 + 0 - 60 = -10 -> clamp 0 -> refuse; with ctx.alt the 50% coin (first RNG draw) fires -> verdict \"alt\"."
+    },
+    {
+      "id": "decide-015",
+      "category": "decide",
+      "fn": "decide",
+      "seed": 201,
+      "args": {
+        "hero": {
+          "courage": 20,
+          "greed": 0,
+          "loyalty": 100,
+          "fear": 20
+        },
+        "action": "rob_stranger",
+        "ctx": {}
+      },
+      "expect": {
+        "verdict": "refuse",
+        "score": 0
+      },
+      "note": "no alt offered: same refusing hero (score 0) stays refuse. Loyalty 100 >= 25 so the gate coin cannot fire — isolates the alt coin. Roll order in decide(): alt coin first, then loyalty gate."
+    },
+    {
+      "id": "exp-001",
+      "category": "exp",
+      "fn": "exp_need",
+      "seed": 1,
+      "args": {
+        "lvls": [
+          1,
+          2,
+          3,
+          5,
+          10,
+          20
+        ]
+      },
+      "expect": {
+        "curve": [
+          105,
+          150,
+          195,
+          285,
+          510,
+          960
+        ]
+      },
+      "note": "expNeed(lvl) = 60 + 45*lvl."
+    },
+    {
+      "id": "exp-002",
+      "category": "exp",
+      "fn": "grant_exp",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "lvl": 1,
+          "exp": 0,
+          "maxHp": 100,
+          "atk": 20,
+          "def": 10,
+          "agi": 8,
+          "hp": 100
+        },
+        "amount": 104
+      },
+      "expect": {
+        "gained": 0,
+        "lvl": 1,
+        "exp": 104,
+        "maxHp": 100,
+        "atk": 20,
+        "def": 10,
+        "agi": 8,
+        "hp": 100
+      },
+      "note": "104 exp at lvl 1 (need 105): no level — stats and hp untouched, exp 104 banked."
+    },
+    {
+      "id": "exp-003",
+      "category": "exp",
+      "fn": "grant_exp",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "lvl": 1,
+          "exp": 0,
+          "maxHp": 100,
+          "atk": 20,
+          "def": 10,
+          "agi": 8,
+          "hp": 40
+        },
+        "amount": 105
+      },
+      "expect": {
+        "gained": 1,
+        "lvl": 2,
+        "exp": 0,
+        "maxHp": 110,
+        "atk": 22,
+        "def": 11,
+        "agi": 9,
+        "hp": 70
+      },
+      "note": "exactly 105: one level. maxHp=round(100*1.10)=110, atk=round(20*1.09)=22, def=round(10*1.06)=11, agi=round(8*1.03)+1=9, hp=min(110, 40+30)=70."
+    },
+    {
+      "id": "exp-004",
+      "category": "exp",
+      "fn": "grant_exp",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "lvl": 1,
+          "exp": 0,
+          "maxHp": 100,
+          "atk": 20,
+          "def": 10,
+          "agi": 8,
+          "hp": 100
+        },
+        "amount": 400
+      },
+      "expect": {
+        "gained": 2,
+        "lvl": 3,
+        "exp": 145,
+        "maxHp": 121,
+        "atk": 24,
+        "def": 12,
+        "agi": 10,
+        "hp": 121
+      },
+      "note": "multi-level cascade: needs 105+150=255 (2 levels, 145 banked). Growth applies per level with rounding between levels (compounding round chain)."
+    },
+    {
+      "id": "exp-005",
+      "category": "exp",
+      "fn": "grant_exp",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "lvl": 5,
+          "exp": 280,
+          "maxHp": 161,
+          "atk": 28,
+          "def": 12,
+          "agi": 9,
+          "hp": 3
+        },
+        "amount": 30
+      },
+      "expect": {
+        "gained": 1,
+        "lvl": 6,
+        "exp": 25,
+        "maxHp": 177,
+        "atk": 31,
+        "def": 13,
+        "agi": 10,
+        "hp": 33
+      },
+      "note": "banked exp counts: 280+30=310 vs need(5)=285 -> one level, leftover 25; hp floors up via +30 heal to 33 of the new maxHp."
+    },
+    {
+      "id": "mast-001",
+      "category": "rewards",
+      "fn": "master_curve",
+      "seed": 1,
+      "args": {
+        "lvls": [
+          1,
+          2,
+          3,
+          5,
+          10
+        ]
+      },
+      "expect": {
+        "need": [
+          100,
+          200,
+          300,
+          500,
+          1000
+        ]
+      },
+      "note": "masterExpNeed(lvl) = 100*lvl."
+    },
+    {
+      "id": "mast-002",
+      "category": "rewards",
+      "fn": "grant_master_exp",
+      "seed": 1,
+      "args": {
+        "level": 1,
+        "exp": 0,
+        "n": 250
+      },
+      "expect": {
+        "gained": 1,
+        "level": 2,
+        "exp": 150
+      },
+      "note": "250 exp at ML1: 100+150 -> 2 levels, 0 banked."
+    },
+    {
+      "id": "mast-003",
+      "category": "rewards",
+      "fn": "grant_master_exp",
+      "seed": 1,
+      "args": {
+        "level": 2,
+        "exp": 50,
+        "n": 160
+      },
+      "expect": {
+        "gained": 1,
+        "level": 3,
+        "exp": 10
+      },
+      "note": "carried exp: 50+160=210 vs need(2)=200 -> ML3 with 10 banked (leftover carries across the level line)."
+    },
+    {
+      "id": "mast-004",
+      "category": "rewards",
+      "fn": "cost_hooks",
+      "seed": 1,
+      "args": {
+        "level": 1
+      },
+      "expect": {
+        "level": 1,
+        "rosterCap": 24,
+        "recruitCost": 120,
+        "restMult": 1,
+        "masterExpNeed": 100
+      },
+      "note": "unlock hooks at ML1: rosterCap 24, recruitCost 120, restMult 1."
+    },
+    {
+      "id": "mast-005",
+      "category": "rewards",
+      "fn": "cost_hooks",
+      "seed": 1,
+      "args": {
+        "level": 2
+      },
+      "expect": {
+        "level": 2,
+        "rosterCap": 30,
+        "recruitCost": 120,
+        "restMult": 1,
+        "masterExpNeed": 200
+      },
+      "note": "ML2: roster cap 24->30 (deep tower unlock)."
+    },
+    {
+      "id": "mast-006",
+      "category": "rewards",
+      "fn": "cost_hooks",
+      "seed": 1,
+      "args": {
+        "level": 4
+      },
+      "expect": {
+        "level": 4,
+        "rosterCap": 30,
+        "recruitCost": 120,
+        "restMult": 0.6,
+        "masterExpNeed": 400
+      },
+      "note": "ML4: rest cost x0.6."
+    },
+    {
+      "id": "mast-007",
+      "category": "rewards",
+      "fn": "cost_hooks",
+      "seed": 1,
+      "args": {
+        "level": 5
+      },
+      "expect": {
+        "level": 5,
+        "rosterCap": 30,
+        "recruitCost": 90,
+        "restMult": 0.6,
+        "masterExpNeed": 500
+      },
+      "note": "ML5: recruit 120->90."
+    },
+    {
+      "id": "rew-001",
+      "category": "rewards",
+      "fn": "floor_rewards",
+      "seed": 1,
+      "args": {
+        "floors": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      },
+      "expect": {
+        "gold": {
+          "1": 65,
+          "2": 90,
+          "3": 115,
+          "4": 140,
+          "5": 165,
+          "6": 190,
+          "7": 215,
+          "8": 240,
+          "9": 265,
+          "10": 600
+        },
+        "permits": {
+          "1": 0,
+          "2": 0,
+          "3": 1,
+          "4": 0,
+          "5": 0,
+          "6": 1,
+          "7": 0,
+          "8": 0,
+          "9": 1,
+          "10": 3
+        }
+      },
+      "note": "floorClearGold(n) = 40+25n except F10=600; floorClearPermits: +1 on 3/6/9, F10=3."
+    },
+    {
+      "id": "rew-002",
+      "category": "rewards",
+      "fn": "floor_rewards",
+      "seed": 1,
+      "args": {
+        "floors": [
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ]
+      },
+      "expect": {
+        "gold": {
+          "11": 315,
+          "12": 340,
+          "13": 365,
+          "14": 390,
+          "15": 415,
+          "16": 440,
+          "17": 465,
+          "18": 490,
+          "19": 515,
+          "20": 900
+        },
+        "permits": {
+          "11": 0,
+          "12": 1,
+          "13": 0,
+          "14": 0,
+          "15": 1,
+          "16": 0,
+          "17": 0,
+          "18": 1,
+          "19": 0,
+          "20": 4
+        }
+      },
+      "note": "deep tower: permits on 12/15/18; F20 gold 900, permits 4."
+    },
+    {
+      "id": "scout-001",
+      "category": "scout",
+      "fn": "scout_cost",
+      "seed": 1,
+      "args": {
+        "floors": [
+          1,
+          5,
+          10,
+          11,
+          12,
+          13,
+          14,
+          20
+        ]
+      },
+      "expect": {
+        "costs": {
+          "1": 10,
+          "5": 10,
+          "10": 10,
+          "11": 25,
+          "12": 25,
+          "13": 25,
+          "14": 10,
+          "20": 10,
+          "constant": 25
+        }
+      },
+      "note": "scoutCost(floor): 25, but 50 inside the DARKNESS band 11-13 (inclusive both ends). M.ScoutCost constant stays 25 for back-compat."
+    },
+    {
+      "id": "foes-001",
+      "category": "enemies",
+      "fn": "make_enemies",
+      "seed": 1,
+      "args": {
+        "floors": [
+          1,
+          4,
+          5,
+          6
+        ]
+      },
+      "expect": {
+        "floors": {
+          "1": [
+            {
+              "name": "Plague Rat",
+              "maxHp": 40,
+              "atk": 8,
+              "def": 2,
+              "bounty": 29,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Plague Rat",
+              "maxHp": 40,
+              "atk": 8,
+              "def": 2,
+              "bounty": 29,
+              "boss": false,
+              "elite": false
+            }
+          ],
+          "4": [
+            {
+              "name": "Dire Wolf",
+              "maxHp": 74,
+              "atk": 14,
+              "def": 3,
+              "bounty": 56,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Dire Wolf",
+              "maxHp": 74,
+              "atk": 14,
+              "def": 3,
+              "bounty": 56,
+              "boss": false,
+              "elite": false
+            }
+          ],
+          "5": [
+            {
+              "name": "Bandit",
+              "maxHp": 85,
+              "atk": 16,
+              "def": 4,
+              "bounty": 65,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Bandit",
+              "maxHp": 85,
+              "atk": 16,
+              "def": 4,
+              "bounty": 65,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Bandit",
+              "maxHp": 85,
+              "atk": 16,
+              "def": 4,
+              "bounty": 65,
+              "boss": false,
+              "elite": false
+            }
+          ],
+          "6": [
+            {
+              "name": "Elite Rattling Skeleton",
+              "maxHp": 144,
+              "atk": 28,
+              "def": 6,
+              "bounty": 111,
+              "boss": false,
+              "elite": true
+            },
+            {
+              "name": "Rattling Skeleton",
+              "maxHp": 96,
+              "atk": 18,
+              "def": 4,
+              "bounty": 74,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Rattling Skeleton",
+              "maxHp": 96,
+              "atk": 18,
+              "def": 4,
+              "bounty": 74,
+              "boss": false,
+              "elite": false
+            }
+          ]
+        }
+      },
+      "note": "makeEnemies scaling: hp = round(40*(1+0.28(n-1))*m), atk = round(8*1.26scale*m), def = round(2*1.22scale*m), bounty = round((20+9n)*m); count 2 (n<=4) else 3; first is Elite (x1.5) from n>=6."
+    },
+    {
+      "id": "foes-002",
+      "category": "enemies",
+      "fn": "make_enemies",
+      "seed": 1,
+      "args": {
+        "floors": [
+          9,
+          11,
+          15,
+          19
+        ]
+      },
+      "expect": {
+        "floors": {
+          "9": [
+            {
+              "name": "Elite Flesh Ogre",
+              "maxHp": 214,
+              "atk": 41,
+              "def": 9,
+              "bounty": 167,
+              "boss": false,
+              "elite": true
+            },
+            {
+              "name": "Flesh Ogre",
+              "maxHp": 143,
+              "atk": 27,
+              "def": 6,
+              "bounty": 111,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Flesh Ogre",
+              "maxHp": 143,
+              "atk": 27,
+              "def": 6,
+              "bounty": 111,
+              "boss": false,
+              "elite": false
+            }
+          ],
+          "11": [
+            {
+              "name": "Elite Tower Knight",
+              "maxHp": 228,
+              "atk": 43,
+              "def": 10,
+              "bounty": 179,
+              "boss": false,
+              "elite": true
+            },
+            {
+              "name": "Tower Knight",
+              "maxHp": 152,
+              "atk": 29,
+              "def": 6,
+              "bounty": 119,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Tower Knight",
+              "maxHp": 152,
+              "atk": 29,
+              "def": 6,
+              "bounty": 119,
+              "boss": false,
+              "elite": false
+            }
+          ],
+          "15": [
+            {
+              "name": "Elite Pale Priest",
+              "maxHp": 295,
+              "atk": 56,
+              "def": 12,
+              "bounty": 233,
+              "boss": false,
+              "elite": true
+            },
+            {
+              "name": "Pale Priest",
+              "maxHp": 197,
+              "atk": 37,
+              "def": 8,
+              "bounty": 155,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Pale Priest",
+              "maxHp": 197,
+              "atk": 37,
+              "def": 8,
+              "bounty": 155,
+              "boss": false,
+              "elite": false
+            }
+          ],
+          "19": [
+            {
+              "name": "Elite Twin Abomination",
+              "maxHp": 399,
+              "atk": 75,
+              "def": 16,
+              "bounty": 315,
+              "boss": false,
+              "elite": true
+            },
+            {
+              "name": "Twin Abomination",
+              "maxHp": 266,
+              "atk": 50,
+              "def": 11,
+              "bounty": 210,
+              "boss": false,
+              "elite": false
+            },
+            {
+              "name": "Twin Abomination",
+              "maxHp": 266,
+              "atk": 50,
+              "def": 11,
+              "bounty": 210,
+              "boss": false,
+              "elite": false
+            }
+          ]
+        }
+      },
+      "note": "floors 9 and 19 bulge x1.1 on top of the elite x1.5; floors 11-19 use the deep-tower mob names."
+    },
+    {
+      "id": "foes-003",
+      "category": "enemies",
+      "fn": "make_enemies",
+      "seed": 1,
+      "args": {
+        "floors": [
+          10,
+          20
+        ]
+      },
+      "expect": {
+        "floors": {
+          "10": [
+            {
+              "name": "THE EXECUTIONER 👹",
+              "maxHp": 1300,
+              "atk": 46,
+              "def": 10,
+              "bounty": 200,
+              "boss": true,
+              "elite": false
+            }
+          ],
+          "20": [
+            {
+              "name": "THE HOLLOW KING 👑",
+              "maxHp": 2250,
+              "atk": 52,
+              "def": 12,
+              "bounty": 400,
+              "boss": true,
+              "elite": false
+            }
+          ]
+        }
+      },
+      "note": "boss rows: F10 THE EXECUTIONER (1300/46/10, bounty 200), F20 THE HOLLOW KING (2250/52/12, bounty 400) — fixed, no scaling."
+    },
+    {
+      "id": "gacha-001",
+      "category": "gacha",
+      "fn": "roll_rarity",
+      "seed": 3001,
+      "args": {
+        "n": 1000
+      },
+      "expect": {
+        "n": 1000,
+        "counts": {
+          "1": 532,
+          "2": 293,
+          "3": 135,
+          "4": 40
+        }
+      },
+      "note": "rollRarity over 1000 seeded draws — empirical distribution vs the 55/28/13/4 table. Bounds documented: every count stays within binomial noise of its rate (sigma ~ 15 at n=1000 for p=.55). Frozen exactly."
+    },
+    {
+      "id": "gacha-002",
+      "category": "gacha",
+      "fn": "roll_rarity",
+      "seed": 3002,
+      "args": {
+        "n": 5000
+      },
+      "expect": {
+        "n": 5000,
+        "counts": {
+          "1": 2737,
+          "2": 1430,
+          "3": 655,
+          "4": 178
+        }
+      },
+      "note": "second independent 5000-draw run (different seed) — a port matching mulberry32 + the cumulative threshold walk (<.55 ->1, <.83 ->2, <.96 ->3, else 4) reproduces both."
+    },
+    {
+      "id": "gacha-003",
+      "category": "gacha",
+      "fn": "roll_trait_seq",
+      "seed": 3003,
+      "args": {
+        "n": 12
+      },
+      "expect": {
+        "traits": [
+          "coldblood",
+          "glassedge",
+          "faintheart",
+          "bloodthirst",
+          "irongut",
+          "nighteyes",
+          "nighteyes",
+          "irongut",
+          "faintheart",
+          "coldblood",
+          "faintheart",
+          "bloodthirst"
+        ]
+      },
+      "note": "rollTrait: uniform index = floor(u*6) over TRAIT_IDS key order [irongut, glassedge, coldblood, bloodthirst, nighteyes, faintheart]."
+    },
+    {
+      "id": "gacha-004",
+      "category": "gacha",
+      "fn": "make_hero_seq",
+      "seed": 3004,
+      "args": {
+        "n": 3
+      },
+      "expect": {
+        "heroes": [
+          {
+            "name": "Kael",
+            "cls": "Rogue",
+            "rarity": 2,
+            "maxHp": 96,
+            "atk": 26,
+            "def": 6,
+            "agi": 22,
+            "courage": 47,
+            "greed": 80,
+            "loyalty": 54,
+            "fear": 20,
+            "trait": "nighteyes",
+            "reaction": "killer",
+            "personality": "Greedy"
+          },
+          {
+            "name": "Rook",
+            "cls": "Tank",
+            "rarity": 4,
+            "maxHp": 269,
+            "atk": 21,
+            "def": 29,
+            "agi": 6,
+            "courage": 84,
+            "greed": 79,
+            "loyalty": 69,
+            "fear": 9,
+            "trait": "nighteyes",
+            "reaction": "laststand",
+            "personality": "Brave"
+          },
+          {
+            "name": "Ilya",
+            "cls": "Tank",
+            "rarity": 1,
+            "maxHp": 157,
+            "atk": 12,
+            "def": 15,
+            "agi": 6,
+            "courage": 20,
+            "greed": 11,
+            "loyalty": 68,
+            "fear": 29,
+            "trait": "bloodthirst",
+            "reaction": "steady",
+            "personality": "Cautious"
+          }
+        ]
+      },
+      "note": "full recruit pipeline per hero (in RNG order): rarity roll, class pick, 4x stat variance rnd(.92,1.08) (hp/atk/def/agi), name pick, axes ri(20,90)/ri(10,90)/ri(50,90)/ri(5,30), trait roll; reaction derived from axes (precedence courage70/loyalty80/fear70/greed70/steady); personality from label(). RARITY_MULT {1:.82, 2:1, 3:1.25, 4:1.5}."
+    },
+    {
+      "id": "gacha-005",
+      "category": "gacha",
+      "fn": "gacha_flow",
+      "seed": 3005,
+      "args": {
+        "gold": 250,
+        "permits": 2,
+        "n": 5
+      },
+      "expect": {
+        "recruits": [
+          {
+            "name": "Pip",
+            "cls": "Healer",
+            "rarity": 1,
+            "maxHp": 83,
+            "atk": 11,
+            "def": 7,
+            "trait": "nighteyes",
+            "reaction": "protective",
+            "used": "1 Permit"
+          },
+          {
+            "name": "Dain",
+            "cls": "Healer",
+            "rarity": 3,
+            "maxHp": 116,
+            "atk": 17,
+            "def": 9,
+            "trait": "glassedge",
+            "reaction": "steady",
+            "used": "1 Permit"
+          },
+          {
+            "name": "Rin",
+            "cls": "Mage",
+            "rarity": 2,
+            "maxHp": 76,
+            "atk": 30,
+            "def": 5,
+            "trait": "nighteyes",
+            "reaction": "protective",
+            "used": "120 Gold"
+          },
+          {
+            "name": "Nyx",
+            "cls": "Warrior",
+            "rarity": 1,
+            "maxHp": 94,
+            "atk": 17,
+            "def": 9,
+            "trait": "irongut",
+            "reaction": "laststand",
+            "used": "120 Gold"
+          },
+          null
+        ],
+        "gold": 10,
+        "permits": 0,
+        "roster": 4
+      },
+      "note": "gacha economy: 2 permit recruits first, then gold at 120/hero until it cannot pay (250 -> 240 spent, 5th attempt returns null). Roster counts only successful recruits."
+    },
+    {
+      "id": "gacha-006",
+      "category": "gacha",
+      "fn": "gacha_flow",
+      "seed": 3006,
+      "args": {
+        "gold": 0,
+        "permits": 0,
+        "n": 2
+      },
+      "expect": {
+        "recruits": [
+          null,
+          null
+        ],
+        "gold": 0,
+        "permits": 0,
+        "roster": 0
+      },
+      "note": "broke Master: no permits and less than recruitCost() gold -> null, roster stays 0."
+    },
+    {
+      "id": "rest-001",
+      "category": "misc",
+      "fn": "rest",
+      "seed": 1,
+      "args": {
+        "masterLevel": 1,
+        "heroes": [
+          {
+            "name": "A",
+            "maxHp": 100,
+            "hp": 40,
+            "fear": 30
+          },
+          {
+            "name": "B",
+            "maxHp": 200,
+            "hp": 200,
+            "fear": 10
+          }
+        ]
+      },
+      "expect": {
+        "cost": 24,
+        "hp": [
+          100,
+          200
+        ],
+        "fear": [
+          5,
+          0
+        ],
+        "gold": 226
+      },
+      "note": "rest: cost = ceil(missing*0.4*restMult) = ceil(60*0.4) = 24 gold; heals everyone to max, fear -25 clamped at 0 (A 30->5, B 10->0)."
+    },
+    {
+      "id": "rest-002",
+      "category": "misc",
+      "fn": "rest",
+      "seed": 1,
+      "args": {
+        "masterLevel": 4,
+        "heroes": [
+          {
+            "name": "A",
+            "maxHp": 100,
+            "hp": 40,
+            "fear": 99
+          }
+        ]
+      },
+      "expect": {
+        "cost": 15,
+        "hp": [
+          100
+        ],
+        "fear": [
+          74
+        ],
+        "gold": 235
+      },
+      "note": "ML4 rest discount x0.6: ceil(60*0.4*0.6) = ceil(14.4) = 15. Fear 99 -> 74."
+    },
+    {
+      "id": "bond-001",
+      "category": "misc",
+      "fn": "bonds",
+      "seed": 1,
+      "args": {
+        "heroes": [
+          {
+            "name": "A"
+          },
+          {
+            "name": "B"
+          },
+          {
+            "name": "C"
+          }
+        ],
+        "ops": [
+          [
+            "addBond",
+            1,
+            2,
+            40
+          ],
+          [
+            "addBond",
+            1,
+            2,
+            30
+          ],
+          [
+            "addBond",
+            2,
+            3,
+            -15
+          ],
+          [
+            "bond",
+            1,
+            3
+          ]
+        ],
+        "party": [
+          1,
+          2,
+          3
+        ],
+        "deadId": 2
+      },
+      "expect": {
+        "log": [
+          40,
+          70,
+          -15,
+          0
+        ],
+        "bondedPairs": [
+          [
+            1,
+            2,
+            70
+          ]
+        ],
+        "mourners": [
+          1
+        ]
+      },
+      "note": "bond writes are symmetric, clamped -100..100 (40 then +30 -> 70, not 100 on write 1); reads mirror; bondedPairs needs >=60; mournersOf(dead) = living heroes with bond >=30 to the dead id."
+    },
+    {
+      "id": "pers-001",
+      "category": "misc",
+      "fn": "label",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 75,
+          "greed": 40,
+          "loyalty": 50,
+          "fear": 20
+        }
+      },
+      "expect": {
+        "personality": "Brave"
+      },
+      "note": "personality precedence: courage>=70 Brave; fear>=70 Coward; greed>=70 Greedy; loyalty>=80 Loyal; greed>=60&&courage>=60 Reckless; fear<=30&&courage<=40 Cautious; else highest axis."
+    },
+    {
+      "id": "pers-002",
+      "category": "misc",
+      "fn": "label",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 65,
+          "greed": 65,
+          "loyalty": 50,
+          "fear": 20
+        }
+      },
+      "expect": {
+        "personality": "Reckless"
+      },
+      "note": "Reckless band: greed>=60 AND courage>=60."
+    },
+    {
+      "id": "pers-003",
+      "category": "misc",
+      "fn": "label",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 30,
+          "greed": 40,
+          "loyalty": 50,
+          "fear": 25
+        }
+      },
+      "expect": {
+        "personality": "Cautious"
+      },
+      "note": "Cautious band: fear<=30 AND courage<=40."
+    },
+    {
+      "id": "pers-004",
+      "category": "misc",
+      "fn": "label",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 50,
+          "greed": 40,
+          "loyalty": 90,
+          "fear": 20
+        }
+      },
+      "expect": {
+        "personality": "Loyal"
+      },
+      "note": "loyalty 90 but courage 50: falls through to highest-axis rule (loyalty 90 wins the fallback loop) — Loyal via fallback, not the >=80 shortcut (same word, different branch)."
+    },
+    {
+      "id": "rxfor-001",
+      "category": "misc",
+      "fn": "reaction_for",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 72,
+          "greed": 90,
+          "loyalty": 85,
+          "fear": 80
+        }
+      },
+      "expect": {
+        "reaction": "laststand"
+      },
+      "note": "reactionFor precedence: courage>=70 wins over everything -> laststand."
+    },
+    {
+      "id": "rxfor-002",
+      "category": "misc",
+      "fn": "reaction_for",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 69,
+          "greed": 90,
+          "loyalty": 85,
+          "fear": 80
+        }
+      },
+      "expect": {
+        "reaction": "protective"
+      },
+      "note": "courage under 70: loyalty>=80 -> protective (before fear and greed)."
+    },
+    {
+      "id": "rxfor-003",
+      "category": "misc",
+      "fn": "reaction_for",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 50,
+          "greed": 90,
+          "loyalty": 70,
+          "fear": 75
+        }
+      },
+      "expect": {
+        "reaction": "cowardretreat"
+      },
+      "note": "fear>=70 -> cowardretreat beats greed>=70."
+    },
+    {
+      "id": "rxfor-004",
+      "category": "misc",
+      "fn": "reaction_for",
+      "seed": 1,
+      "args": {
+        "hero": {
+          "courage": 50,
+          "greed": 90,
+          "loyalty": 70,
+          "fear": 30
+        }
+      },
+      "expect": {
+        "reaction": "killer"
+      },
+      "note": "greed>=70 -> killer; everything under the lines -> steady."
+    },
+    {
+      "id": "tel-001",
+      "category": "misc",
+      "fn": "telemetry_normalize",
+      "seed": 1,
+      "args": {
+        "telemetry": {
+          "run_started": 3,
+          "hero_died": 1.7,
+          "bogus_key": 9,
+          "combat_started": 0
+        }
+      },
+      "expect": {
+        "telemetry": {
+          "run_started": 3,
+          "scout_used": 0,
+          "combat_started": 0,
+          "hero_injured": 0,
+          "hero_died": 1,
+          "floor_cleared": 0,
+          "run_ended": 0,
+          "second_run": 0
+        },
+        "ver": 7
+      },
+      "note": "telemetry normalize: known counters floored to int, zero/negative dropped, unknown keys (schema drift) dropped; migrateToV7 stamps ver 7."
+    }
+  ]
+}
