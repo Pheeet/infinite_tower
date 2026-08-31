@@ -209,207 +209,214 @@ function outlinePass(s) {
 var GRID_W = 12, GRID_H = 16;
 
 var HERO_GRIDS = {
+/* V0.29 CONSTRUCTION RULES — one skeleton for the whole roster:
+   rows 0-1 headgear · 2-5 face (cols 3-8) · 6 shoulders (2-9) · 6-11 torso ·
+   12-14 legs · 15 FEET ON THE BASELINE. Every class shares this exact
+   skeleton; equipment may occupy the side columns (0-2 / 9-11) and the
+   headgear rows, but NEVER shifts the body axis. Alignment reference =
+   the feet, not the weapon bounding box. */
 Warrior: {
   idle: [
-    '....HHHH',
-    '...HHHHHH',
-    '...HSHSHS',
-    '...SESEES',
-    '...SSSSSS',
+    '...MMMMMM',
+    '...MMMMMM',
+    '...MMMMMM',
+    '...MEMMEM',
+    '...MMMMMM',
     '....SSSS',
-    '..MCCCCAA',
-    '.MCCACCCC',
-    '.SCCCCGCC',
-    'S..CCCCC.LB',
-    '...CCCLC.LB',
-    '...CC.CC.LB',
-    '..CCL.CCLLB',
-    '..CC...CC',
-    '..LL...LL',
-    '.LLL..LLL'
+    'MMCCCCCCCCSB',
+    'MMCCCCCCCC.B',
+    'MMCCCCCCCC.B',
+    'MMCCCCCCCC.B',
+    'MMcccGGccc.B',
+    'MMCCCCCCCC.B',
+    'MM..CC..CCLG',
+    'MM..CC..CC',
+    'MM..LL..LL',
+    'MM.LLL..LLL'
   ],
   atk: [
-    '........bb',
-    '.......BBB',
-    '.....HHHHG',
-    '...HHHHHGG',
-    '...HSHSHS',
-    '...SESEES',
-    '...SSSSSS',
-    '....SSSS',
-    '..MCCCCAA',
-    '.MCCACCCC',
-    '.SCCCCGCC',
-    'S..CCCCC',
-    '...CCCLC',
-    '...CC.CC',
-    '..CCL.CCL',
-    '..LL...LL'
+    '..........Bb',
+    '..........BB',
+    '...MMMMMMGB',
+    '...MMMMMMGB',
+    '...MEMMEMGB',
+    '....SSSS.GB',
+    'MMCCCCCCCCSB',
+    'MMCCCCCCCC.B',
+    'MMCCCCCCCC.B',
+    'MMCCCCCCCC',
+    'MMcccGGccc',
+    'MMCCCCCCCC',
+    'MM..CC..CC',
+    'MM..CC..CC',
+    'MM..LL..LL',
+    'MM.LLL..LLL'
   ]
 },
 Tank: {
   idle: [
-    '....MMMM',
     '...MMMMMM',
-    '...MEMEMM',
+    '...MMMMMM',
+    '...MEMMEM',
+    '...MMMMMM',
+    '...MMMMMM',
     '....SSSS',
-    '....CCCCA',
-    'MMMCCCCCCm',
-    'MMMCCACCCm',
-    'MMMCCGCCCL',
-    'MMMCCCCCCL',
-    'MMMCCCCC.M',
-    'MMMCLCCCL',
-    'MMMCC.CCL',
-    'MMMC..CC',
-    '.MM...LL',
-    '.LL..LLL',
-    '..L...LL'
+    'MMMCCCCCCCM',
+    'MMMCCCCCCCM',
+    'MMMCCCCCCCL',
+    'MMMCCCCCCSCL',
+    'MMMcccGGccL',
+    'MMMCCCCCCCC',
+    'MMM..CC..CC',
+    'MMM..CC..CC',
+    'MMM..LL..LL',
+    'MMMLLL..LLL'
   ],
   atk: [
-    '.......MMm',
-    '....MMMM.Mm',
-    '...MMMMMML',
-    '...MEMEM.L',
-    '....SSSSL',
-    'MMMCCCCA',
-    'MMMCCACCCm',
-    'MMMCCGCCCL',
-    'MMMCCCCCCL',
-    'MMMCCCCCC',
-    'MMMCLCCCC',
-    'MMMCC.CC',
-    'MMMC..CC',
-    '.MM...LL',
-    '.LL..LLL',
-    '..L...LL'
+    '..........MM',
+    '..........MM',
+    '...MMMMMMLL',
+    '...MEMMEMLL',
+    '...MMMMMMLL',
+    '....SSSS',
+    'MMMCCCCCCCM',
+    'MMMCCCCCCCM',
+    'MMMCCCCCCCC',
+    'MMMCCCCCCCC',
+    'MMMcccGGccc',
+    'MMMCCCCCCCC',
+    'MMM..CC..CC',
+    'MMM..CC..CC',
+    'MMM..LL..LL',
+    'MMMLLL..LLL'
   ]
 },
 Rogue: {
   idle: [
-    '....CCCC',
     '...CCCCCC',
-    '...CSESEC',
-    '...CSSSSC',
+    '...CCCCCC',
+    '...CCCCCC',
+    '...CESEEC',
     '....SSSS',
-    '...CCCCAA',
-    '..CCACCCC',
-    '..SCCGCCC',
-    'S..CCCCC',
-    '...CCCC.LB',
-    '...CC.CCLB',
-    '...CC.CCLB',
-    '..CCL.CCL',
-    '..CC...CC',
-    '..LL...LL',
-    '.LLL..LLL'
+    '....SSSS',
+    '..CCCCCCCCSB',
+    '..CCCCCCCC.B',
+    '..CCCCCCCC.B',
+    '..CCCCCCCC.B',
+    '..cccGGccc.B',
+    '..CCCCCCCC.B',
+    '...CC..CCLG',
+    '...CC..CC',
+    '...LL..LL',
+    '..LLL..LLL'
   ],
   atk: [
     '.........Bb',
     '.........BB',
-    '....CCCC.L',
-    '...CCCCCCL',
-    '...CSESEC',
-    '...CSSSSC',
+    '...CCCCCCLB',
+    '...CESEECLB',
+    '....SSSS.LB',
     '....SSSS',
-    '...CCCCAA',
-    '..CCACCCC',
-    '..SCCGCCC',
-    'S..CCCCC',
-    '...CCCC',
-    '...CC.CC',
-    '..CCL.CCL',
-    '..LL...LL',
-    '.LLL..LLL'
+    '..CCCCCCCCSB',
+    '..CCCCCCCC',
+    '..CCCCCCCC',
+    '..CCCCCCCC',
+    '..cccGGccc',
+    '..CCCCCCCC',
+    '...CC..CC',
+    '...CC..CC',
+    '...LL..LL',
+    '..LLL..LLL'
   ]
 },
 Mage: {
   idle: [
-    '........Oo',
-    '.........OO',
-    '....CC...Oo',
-    '..CCCCCC.GG',
-    '...HSHSHS',
-    '...SESEES',
-    '...SSSSSS',
-    '....CCCCA',
+    '..........OO',
+    '.........OoO',
+    '..CCCCCCCCGL',
+    '...HSHSHH',
+    '...SESSES',
+    '....SSSS',
+    '..CCCCCCCC',
+    '..CCCCCCCC',
+    '..CCCCCCCC',
+    '..CCCAACCC',
+    '..cccGGccc',
+    '..CCCCCCCC',
     '...CCCCCC',
-    '...CCGCCC.L',
-    '...CCCCCC.L',
-    '...CCCC.C.L',
-    '..CCL.CCL.L',
-    '..CC...CC.L',
-    '..LL...LL',
-    '.LLL..LLL'
+    '...CCCCCC',
+    '...CCCCCC',
+    '..LLL..LLL'
   ],
   atk: [
-    '........WW',
-    '.......OOO',
-    '....CC..Oo',
-    '..CCCCCCGG',
-    '...HSHSHS',
-    '...SESEES',
-    '...SSSSSS',
-    '....CCCCA',
+    '..........WW',
+    '.........OOO',
+    '..CCCCCCCCGL',
+    '...HSHSHH',
+    '...SESSES',
+    '....SSSS',
+    '..CCCCCCCC',
+    '..CCCCCCCC',
+    '..CCCCCCCC',
+    '..CCCAACCC',
+    '..cccGGccc',
+    '..CCCCCCCC',
     '...CCCCCC',
-    '...CCGCCC.LL',
-    '...CCCCCCLL',
-    '...CCCC.C.L',
-    '..CCL.CCL.L',
-    '..CC...CC',
-    '..LL...LL',
-    '.LLL..LLL'
+    '...CCCCCC',
+    '...CCCCCC',
+    '..LLL..LLL'
   ]
 },
 Healer: {
   idle: [
-    '....HHHH',
+    '...HHHHHH',
     '...HHHHHH',
     '...GGGGGG',
-    '...HSHSHS',
-    '...SESEES',
-    '...SSSSSS',
-    '..H.SSSS.H',
-    '..HCCCCA.H',
-    '..HCAAAAA.H',
-    '..HCCCGCC.A',
-    '..HCCCCCC.L',
-    '..HCCCCC.L',
-    '..HCCC.CC.L',
-    '...CCL.CCL',
-    '...LL...LL',
-    '..LLL..LLL'
+    '...SESSES',
+    '...SESSES',
+    '....SSSS',
+    'H.CCCCCCCC.A',
+    'H.CCCCCCCC.A',
+    'H.CCCAACCC.A',
+    'H.CCCAACCC.A',
+    'H.cccGGccc.A',
+    'H.CCCCCCCC.L',
+    'H..CCCCCC.L',
+    'H..CCCCCC.L',
+    'H..CCCCCC.L',
+    'H.LLL..LLL'
   ],
   atk: [
-    '.........AA',
-    '....HHHH.AA',
-    '...HHHHHHL',
-    '...GGGGGGL',
-    '...HSHSHS',
-    '...SESEES',
-    '...SSSSSS',
-    '..H.CCCCA',
-    '..HCCAAAAA',
-    '..HCCCGCC',
-    '..HCCCCCC',
-    '..HCCCCC',
-    '..HCCC.CC',
-    '...CCL.CCL',
-    '...LL...LL',
-    '..LLL..LLL'
+    '..........AA',
+    '.........AAA',
+    '...HHHHHHLA',
+    '...GGGGGGLL',
+    '...SESSES',
+    '....SSSS',
+    'H.CCCCCCCC',
+    'H.CCCCCCCC',
+    'H.CCCAACCC',
+    'H.CCCAACCC',
+    'H.cccGGccc',
+    'H.CCCCCCCC',
+    'H..CCCCCC',
+    'H..CCCCCC',
+    'H..CCCCCC',
+    'H.LLL..LLL'
   ]
 }
 };
 
-/* per-hero fringe variants — the face's จุดจำ */
-function applyFringe(rows, v) {
+/* per-hero fringe variants — face identity without breaking the axis */
+function applyFringe(rows, v, cls) {
   var r = rows.slice();
   if (v === 1) {            /* side-swept */
-    r[0] = '..HHHH';
+    r[0] = '..HHHHHH';
     r[1] = '..HHHHHH';
-  } else if (v === 2) {     /* hair over one eye */
-    r[2] = r[2].replace('SE', 'HE');
-    r[3] = r[3].replace('SE', 'HE');
+  } else if (v === 2 && cls !== 'Tank' && cls !== 'Rogue') {  /* hair over the left eye */
+    var row3 = r[3].split('');
+    if (row3[4] === 'E') row3[4] = 'H';
+    r[3] = row3.join('');
   }
   return r;
 }
@@ -459,7 +466,7 @@ function makeHeroSprite(cls, id, pose, marks) {
   };
 
   var base = HERO_GRIDS[cls] || HERO_GRIDS.Warrior;
-  var rows = applyFringe(base[pose === 'atk' ? 'atk' : 'idle'], (cls === 'Tank' || cls === 'Rogue') ? 0 : fringeV);
+  var rows = applyFringe(base[pose === 'atk' ? 'atk' : 'idle'], fringeV, cls);
   var dy = (pose === 'idle1') ? 1 : 0;   /* breathe: head block sinks, feet stay */
 
   var s = sprCanvas(GRID_W, GRID_H), g = s.g;
