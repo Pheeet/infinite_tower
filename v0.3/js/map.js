@@ -49,10 +49,11 @@ window.IT.map = window.IT.map || {};
     };
   }
 
-  // X positions for one row: 1 node → wander around center, 2 nodes → flanks.
-  function rowX(count) {
-    if (count < 2) return [50 + ri(-16, 16)];
-    return [27 + ri(-7, 7), 73 + ri(-7, 7)];
+  // V0.30: grid lanes — 1 node rides the center lane, 2 nodes take the
+  // flanks. No jitter: nodes NEVER overlap, the route reads balanced.
+  function rowY(count) {
+    if (count < 2) return [50];
+    return [26, 74];
   }
 
   /* gen(floor) → MapObj.
@@ -89,13 +90,12 @@ window.IT.map = window.IT.map || {};
 
     var step = (84 - 24) / (rows - 1);
     for (r = 0; r < rows; r++) {
-      var x = 24 + r * step;                 // progression → right
-      var ys = rowX(counts[r]);              // flank values reused as Y (28 / 72)
-      ys = ys.map(function (v) { return v * 0.92 + 4; });
+      var x = Math.round(24 + r * step);      // progression → right, grid columns
+      var ys = rowY(counts[r]);               // grid lanes: 26 / 50 / 74
       var ids = [];
       for (i = 0; i < counts[r]; i++) {
         var type = rollType();
-        var n = mkNode('n' + (id++), type, x + ri(-3, 3), ys[i], threatFor(floor, TYPE_BIAS[type] || 0));
+        var n = mkNode('n' + (id++), type, x, ys[i], threatFor(floor, TYPE_BIAS[type] || 0));
         nodes.push(n);
         ids.push(n.id);
       }

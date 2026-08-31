@@ -2233,7 +2233,7 @@ function dungeonFrame(now) {
     dn.units.forEach(function (u, i) {
       if (u.mode === 'walk') {
         var dx = u.tx - u.x;
-        u.x += Math.sign(dx) * 46 * dt;
+        u.x += Math.sign(dx) * 130 * dt;
         if (Math.abs(dx) < 2) { u.x = u.tx; u.mode = 'stand'; }
         else allArrived = false;
       }
@@ -2327,7 +2327,7 @@ function dungeonAttach(root, opts) {
         name: hero.name,
         sprs: { idle0: makeHeroSprite(hero.cls, hero.id, 'idle0', mk),
                 idle1: makeHeroSprite(hero.cls, hero.id, 'idle1', mk) },
-        x: -30 - i * 26, y: h * 0.74 - i * 6,
+        x: -22 - i * 16, y: h * 0.74 - i * 6,
         tx: w / 2 - 64 + i * 64, mode: 'walk',
         lowHp: hero.maxHp ? (hero.hp / hero.maxHp) < 0.4 : false,
         afraid: (hero.fear || 0) > 60
