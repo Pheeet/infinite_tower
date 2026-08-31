@@ -69,9 +69,13 @@ function reducedMotion() {
 function resize() {
   if (!st) return;
   try {
-    var w = Math.max(300, Math.min(430, st.root.clientWidth || st.root.offsetWidth || 430));
-    var h = Math.max(400, Math.min(480, Math.round(w * 1.08)));
-    var dpr = Math.max(1, Math.min(2.5, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
+    /* ponytail: no 300px floor — a 320px device has ~288px content; a floor
+       stretches the bitmap ≠ hitboxes (offset taps). h also respects viewport
+       height so the command bar isn't below the fold on short/rotated phones */
+    var w = Math.min(430, st.root.clientWidth || st.root.offsetWidth || 430);
+    var vh = (typeof window !== 'undefined' && window.innerHeight) || 0;
+    var h = Math.max(320, Math.min(480, Math.round(w * 1.08), vh ? Math.round(vh * 0.62) : 480));
+    var dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
     st.w = w; st.h = h; st.dpr = dpr;
     st.canvas.width = Math.round(w * dpr);
     st.canvas.height = Math.round(h * dpr);
@@ -2050,6 +2054,22 @@ function lobbyTap(ev) {
   }
 }
 
+function lobbyResize() {
+  /* rotation / Safari toolbar / hero drawer changed the box — re-measure */
+  if (!lb || lb.dead || !lb.canvas.parentElement) return;
+  try {
+    var root = lb.canvas.parentElement;
+    var w = Math.min(430, root.clientWidth || lb.w);
+    var ch = root.clientHeight || 0;
+    var h = (ch > 240) ? ch : lb.h;
+    if (w === lb.w && h === lb.h) return;
+    lb.w = w; lb.h = h;
+    lb.dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
+    lb.canvas.width = Math.round(w * lb.dpr); lb.canvas.height = Math.round(h * lb.dpr);
+    lb.canvas.style.height = h + 'px';
+    lb.units = {};   /* px slot positions are stale — heroes re-walk to new spots */
+  } catch (e) { /* keep last size */ }
+}
 function lobbyAttach(root, onTap, onZone) {
   if (!HAS_DOM || !HAS_RAF || !root) return false;
   try {
@@ -2057,11 +2077,11 @@ function lobbyAttach(root, onTap, onZone) {
     if (!canvas.getContext) return false;
     root.innerHTML = '';
     root.appendChild(canvas);
-    var w = Math.max(300, Math.min(430, root.clientWidth || root.offsetWidth || 430));
+    var w = Math.min(430, root.clientWidth || root.offsetWidth || 430);
     /* V0.16: the hall fills the viewport — CSS sets the height, we honor it */
     var ch = root.clientHeight || 0;
     var h = (ch > 240) ? ch : Math.max(280, Math.min(370, Math.round(w * 0.80)));
-    var dpr = Math.max(1, Math.min(2.5, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
+    var dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
     lb = { canvas: canvas, ctx: canvas.getContext('2d'), units: {}, parts: [],
       t0: performance.now(), last: 0, raf: 0, dpr: dpr, w: w, h: h,
       dead: false, fade: 0, emb: 0, lc: null, lg: null, sel: null,
@@ -2069,6 +2089,7 @@ function lobbyAttach(root, onTap, onZone) {
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     canvas.style.height = h + 'px';
     canvas.addEventListener('click', lobbyTap);
+    window.addEventListener('resize', lobbyResize);
     lb.raf = requestAnimationFrame(lbFrame);
     return true;
   } catch (e) { lb = null; return false; }
@@ -2078,6 +2099,7 @@ function lobbyDetach() {
   lb.dead = true;
   try { if (lb.raf) cancelAnimationFrame(lb.raf); } catch (e) { /* ignore */ }
   try { lb.canvas.removeEventListener('click', lobbyTap); } catch (e) { /* ignore */ }
+  try { window.removeEventListener('resize', lobbyResize); } catch (e) { /* ignore */ }
   lb = null;
 }
 
@@ -2143,6 +2165,7 @@ function dungeonFrame(now) {
     }
     /* V0.31: a worn inlay runs from under the party's feet to the door —
        the room itself points at what's next */
+    var cx = w / 2;   /* was declared below its first use — inlay never drew */
     ctx.fillStyle = 'rgba(120,124,120,.10)';
     ctx.beginPath();
     ctx.moveTo(cx - 30, wallB - 18);
@@ -2155,7 +2178,7 @@ function dungeonFrame(now) {
     ctx.beginPath(); ctx.moveTo(cx + 30, wallB - 18); ctx.lineTo(cx + 78, h); ctx.stroke();
 
     /* ---- the far end: what KIND of room is this? ---- */
-    var cx = w / 2, cy = wallB - 24;
+    var cy = wallB - 24;
     if (dn.room === 'corridor' || dn.room === 'combat') {
       /* a deeper dark doorway ahead */
       ctx.fillStyle = '#05070a';
@@ -2340,6 +2363,24 @@ function dungeonFrame(now) {
   if (dn && !dn.dead) dn.raf = requestAnimationFrame(dungeonFrame);
 }
 
+function dungeonResize() {
+  if (!dn || dn.dead || !dn.canvas.parentElement) return;
+  try {
+    var root = dn.canvas.parentElement;
+    var w = Math.min(430, root.clientWidth || dn.w);
+    var ch = root.clientHeight || 0;
+    var h = (ch > 0) ? Math.max(160, Math.min(440, ch)) : dn.h;
+    if (w === dn.w && h === dn.h) return;
+    dn.w = w; dn.h = h;
+    dn.dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
+    dn.canvas.width = Math.round(w * dn.dpr); dn.canvas.height = Math.round(h * dn.dpr);
+    dn.canvas.style.height = h + 'px';
+    dn.units.forEach(function (u, i) {
+      u.tx = w / 2 - 64 + i * 64;
+      if (u.mode !== 'walk') u.y = h * 0.74 - i * 6;
+    });
+  } catch (e) { /* keep last size */ }
+}
 function dungeonAttach(root, opts) {
   if (!HAS_DOM || !HAS_RAF || !root || !opts) return false;
   try {
@@ -2347,10 +2388,12 @@ function dungeonAttach(root, opts) {
     if (!canvas.getContext) return false;
     root.innerHTML = '';
     root.appendChild(canvas);
-    var w = Math.max(300, Math.min(430, root.clientWidth || root.offsetWidth || 430));
+    var w = Math.min(430, root.clientWidth || root.offsetWidth || 430);
     var ch = root.clientHeight || 0;
-    var h = (ch > 240) ? Math.min(440, ch) : Math.max(230, Math.min(300, Math.round(w * 0.62)));
-    var dpr = Math.max(1, Math.min(2.5, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
+    /* ponytail: honor the real box height — the old >240 guard forced a 230px
+       canvas into a ~120px SE pane, hiding the whole walk-in behind the clip */
+    var h = (ch > 0) ? Math.max(160, Math.min(440, ch)) : Math.max(230, Math.min(300, Math.round(w * 0.62)));
+    var dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
     var rng = mulberry((opts.floor || 1) * 1013 + 7);
     var pal = DN_PALS[Math.floor(rng() * DN_PALS.length)];
     var units = (opts.party || []).slice(0, 3).map(function (hero, i) {
@@ -2374,6 +2417,7 @@ function dungeonAttach(root, opts) {
     if (!units.length) { dn.arrived = true; }   /* nothing to walk — decide now */
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     canvas.style.height = h + 'px';
+    window.addEventListener('resize', dungeonResize);
     dn.raf = requestAnimationFrame(dungeonFrame);
     return true;
   } catch (e) { dn = null; return false; }
@@ -2382,6 +2426,7 @@ function dungeonDetach() {
   if (!dn) return;
   dn.dead = true;
   try { if (dn.raf) cancelAnimationFrame(dn.raf); } catch (e) { /* ignore */ }
+  try { window.removeEventListener('resize', dungeonResize); } catch (e) { /* ignore */ }
   dn = null;
 }
 

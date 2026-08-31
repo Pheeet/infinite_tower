@@ -2838,6 +2838,8 @@ IT.flow=FLOW;
 })();
 
 /* bootstrap — scripts sit at end of <body>, so the DOM is already parsed */
+/* iOS Safari only applies :active when a touchstart listener exists somewhere */
+document.addEventListener('touchstart', function () {}, { passive: true, capture: true });
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function () { IT.ui.init(); });
 } else {

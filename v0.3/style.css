@@ -46,7 +46,7 @@ body{
   color:var(--txt);
   font:15.5px/1.6 var(--body);
   max-width:430px;margin:0 auto;
-  min-height:100vh;
+  min-height:100%;
   padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
   /* layered candle/stone light over deep near-black — CSS only */
   background:
@@ -1278,6 +1278,9 @@ body::before{
    composition (scene takes ALL remaining space, flex:1); every other
    screen scrolls INSIDE #app on purpose. No manual px budgeting anywhere. */
 html,body{height:100%}
+/* ponytail: dvh so iOS Safari's collapsed-toolbars viewport is what we fill;
+   plain 100% makes the shell taller than visible — nav hides behind URL bar */
+@supports (height:100dvh){html,body{height:100dvh}}
 body{
   overflow:hidden;
   display:flex;flex-direction:column;
@@ -1392,7 +1395,9 @@ body{
    route ~180 (≈22%) / party ~64 (13%) / actions ~52 (12%). Node content
    lives INSIDE the scene as a compact overlay — never a stacked section. */
 #app.fixed-page .exp-shell{display:flex;flex-direction:column;height:100%;min-height:0}
-#app.fixed-page .exp-top{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+/* ponytail: overflow-y:auto not hidden — when the fixed budget exceeds a short
+   viewport (SE 667px), hidden clipped #exp-content = untappable decisions */
+#app.fixed-page .exp-top{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .exp-status{
   flex:none;display:flex;justify-content:space-between;align-items:center;
   gap:8px;padding:2px 0 4px;min-height:0;
@@ -1444,7 +1449,11 @@ body{
 .route-frame #map-box{height:100%;min-height:0}
 /* the old climb-frame forced a 358px map — the route strip is short */
 .route-frame .it-mapwrap{min-height:0;height:100%;background:transparent;border:none;border-radius:0}
-.route-frame .mapnode{width:28px;height:28px;border-width:2px}
+/* ponytail: extra .it-mapwrap for specificity — map.js injects .it-mapwrap .mapnode
+   (48px) after style.css loads and would win the tie; 36px keeps 3 lanes apart,
+   ::before adds tap hit-slop toward the 44px floor */
+.route-frame .it-mapwrap .mapnode{width:36px;height:36px;border-width:2px}
+.route-frame .it-mapwrap .mapnode::before{content:'';position:absolute;inset:-8px}
 .route-frame .mapnode .ic{font-size:10px}
 .route-frame .mapnode .ic.unknown{font-size:11px}
 .route-frame .mapnode .stars{display:none}
@@ -1458,5 +1467,68 @@ body{
 .exp-bottom .march-hp{height:2px}
 .exp-bottom .map-actions{margin:0 0 2px;gap:6px}
 .exp-bottom .map-actions .act{min-height:40px;font-size:8px;padding:6px 8px}
+
+/* ---- iPhone fit pass: SE 375×667 / mini 375×812 (Safari toolbars eat ~90px) ---- */
+@media (max-height:700px){
+  #app.fixed-page .exp-route{height:128px}
+  #exp-canvas{min-height:90px}
+  #exp-content{max-height:none}
+  .exp-bottom .march-fig{width:52px}
+  .exp-bottom .march-strip .hero-sprite{--spr-w:32px}
+  /* short strip → 30% lane pitch ≈ 33px: node must be smaller than its pitch */
+  .route-frame .it-mapwrap .mapnode{width:30px;height:30px}
+}
+/* ponytail: rotated/very-short fallback — fixed composition can't fit ~300px, let it scroll */
+@media (max-height:480px){
+  #app.fixed-page{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #app.fixed-page .exp-route{height:110px}
+  #exp-canvas{min-height:0}
+  .exp-bottom .march-strip{display:none}
+}
+
+/* ==== iPhone support pass (SE→Pro Max): iOS input + narrow-fit fixes ==== */
+/* rapid taps must never double-tap-zoom the page */
+button,.act,.rfchip,.mapnode,.mcr-btn,.cb-btn,.ev-opt,.ev-hero,.ev-continue,.su-hold,.rcard{
+  touch-action:manipulation;
+}
+/* long-press loupe/callout over "HOLD TO REVEAL" + hero names */
+body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.dn-flavor,.node-prose,.ev-text,.cb-log{user-select:text;-webkit-user-select:text}
+#app,#exp-content,#overlay,.cb-log{overscroll-behavior-y:contain}
+
+/* header: 320-393px must not clip the sound toggle / stats */
+#hdr{gap:6px}
+#hdr h1{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#hdr .hstats{min-width:0;gap:8px;font-size:11px}
+#hdr .hsnd{min-width:44px;min-height:44px}
+
+/* overlay: centered flex clips tall dialogs both ways — safe center, scroll when tall */
+#overlay{align-items:safe center;padding-bottom:calc(22px + env(safe-area-inset-bottom,0px))}
+@supports not (align-items:safe center){#overlay{align-items:flex-start}#overlay .obox{margin:auto}}
+
+/* volpop: clear the right notch inset in landscape, stay in the game column on iPad */
+#volpop{right:max(calc(10px + env(safe-area-inset-right,0px)),calc(50vw - 205px))}
+
+/* bond status label ("NEUTRAL") wider than its fixed 62px track */
+.bondrow{grid-template-columns:84px 1fr max-content}
+
+/* tap floors — visual size unchanged where possible, hit area up */
+.pm-x{width:34px;height:34px;top:-8px;right:-10px}
+.rfilters{gap:6px}
+.rfchip{min-height:38px}
+.dn-choices .act,#exp-content .rowbtns .act{min-height:44px;font-size:9px}
+.exp-bottom .map-actions .act{font-size:9px}
+.cb-spd .cb-btn{min-width:44px;min-height:44px}
+
+/* PS2P micro-type floor: 6-7px is unreadable on a phone */
+#nav button{font-size:8px}
+.rfchip{font-size:8px}
+.rslot .rmeta{font-size:7px}
+.risk-line{font-size:8px}
+.march-name{font-size:8px}
+/* splash tagline lost its final letter at 375px — tighter tracking */
+@media (max-width:390px){#splash .sp-kicker{letter-spacing:.16em}}
+
+/* ==== end iPhone support pass ==== */
 
 /* ==== end V0.9.2 pixel pass ==== */

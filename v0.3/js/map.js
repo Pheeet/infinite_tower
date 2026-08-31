@@ -84,7 +84,7 @@ window.IT.map = window.IT.map || {};
     var rowIds = [];
     var id = 0;
 
-    var start = mkNode('n' + (id++), 'start', 5, 50, 1);
+    var start = mkNode('n' + (id++), 'start', 8, 50, 1);
     start.scouted = true; // you know where you stand
     nodes.push(start);
 
@@ -104,7 +104,7 @@ window.IT.map = window.IT.map || {};
 
     var bossFloor = (floor === 10 || floor === 20);
     var endType = bossFloor ? 'boss' : 'combat';
-    var end = mkNode('n' + (id++), endType, 95, 50, bossFloor ? 5 : threatFor(floor, 1));
+    var end = mkNode('n' + (id++), endType, 92, 50, bossFloor ? 5 : threatFor(floor, 1));
     end.scouted = true; // the exit is no secret — only mid rooms hide their nature
     nodes.push(end);
 
@@ -180,8 +180,8 @@ window.IT.map = window.IT.map || {};
     var step = maxD > 1 ? (78 - 22) / (maxD - 1) : 0;
     map.nodes.forEach(function (n) {
       var d = depth[n.id];
-      if (n.id === map.startId) { n.x = 5; n.y = 50; return; }
-      if (n.id === map.endId) { n.x = 95; n.y = 50; return; }
+      if (n.id === map.startId) { n.x = 8; n.y = 50; return; }
+      if (n.id === map.endId) { n.x = 92; n.y = 50; return; }
       var col = byDepth[d];
       n.x = Math.round(22 + (d - 1) * step);
       n.y = col.length <= 3 ? LANES[Math.min(2, col.length - 1)][Math.min(col.indexOf(n), col.length - 1)] : 50;
