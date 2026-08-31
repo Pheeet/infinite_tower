@@ -1731,6 +1731,8 @@ RENDER.expedition=function(app,arg){
 
   /* the route map itself (horizontal, interactive) */
   var box=UI.el('map-box');
+  var rl=mod('map','relayout');
+  if(rl && !ex.map.grid){ try{ rl.call(IT.map,ex.map); }catch(e){} }
   var r=mod('map','render');
   if(r&&box){
     try{ r.call(IT.map,ex.map,box,function(nodeId){ IT.flow.enterNode(nodeId); }); }
@@ -2353,6 +2355,15 @@ var FLOW={
     UI.updateHeader();
     UI.go('expedition');
     scoutOffer();
+    /* V0.30b: the party walks into the FIRST node on its own — the player
+       commands, they don't click through the start tile. (1.6s lets the
+       floor title card finish its beat first.) */
+    setTimeout(function(){
+      var st=S();
+      if(st&&st.expedition&&st.expedition.map===map&&!st.expedition.done[map.startId]){
+        IT.flow.enterNode(map.startId);
+      }
+    },1600);
   },
 
   enterNode:function(id){

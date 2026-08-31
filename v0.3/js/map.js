@@ -84,7 +84,7 @@ window.IT.map = window.IT.map || {};
     var rowIds = [];
     var id = 0;
 
-    var start = mkNode('n' + (id++), 'start', 8, 50 + ri(-10, 10), 1);
+    var start = mkNode('n' + (id++), 'start', 8, 50, 1);
     start.scouted = true; // you know where you stand
     nodes.push(start);
 
@@ -104,7 +104,7 @@ window.IT.map = window.IT.map || {};
 
     var bossFloor = (floor === 10 || floor === 20);
     var endType = bossFloor ? 'boss' : 'combat';
-    var end = mkNode('n' + (id++), endType, 93, 50 + ri(-8, 8), bossFloor ? 5 : threatFor(floor, 1));
+    var end = mkNode('n' + (id++), endType, 93, 50, bossFloor ? 5 : threatFor(floor, 1));
     end.scouted = true; // the exit is no secret — only mid rooms hide their nature
     nodes.push(end);
 
@@ -147,7 +147,46 @@ window.IT.map = window.IT.map || {};
       if (pool.length) pool[pool.length - 1].type = 'remains';
     })();
 
-    return { floor: floor, nodes: nodes, edges: edges, startId: start.id, endId: end.id };
+    return { floor: floor, nodes: nodes, edges: edges, startId: start.id, endId: end.id, grid: 1 };
+  }
+
+  /* V0.30b: relayout(map) — snap an already-generated (or old saved) map
+   * onto the grid: column = BFS depth from start, lane = 26/50/74. Purely
+   * visual — types, edges, cleared flags untouched. Fixes overlapping nodes
+   * from pre-grid saves. */
+  function relayout(map) {
+    if (!map || !map.nodes || !map.edges) return;
+    var adj = Object.create(null);
+    map.edges.forEach(function (e) {
+      (adj[e[0]] = adj[e[0]] || []).push(e[1]);
+      (adj[e[1]] = adj[e[1]] || []).push(e[0]);
+    });
+    var depth = Object.create(null);
+    depth[map.startId] = 0;
+    var q = [map.startId];
+    while (q.length) {
+      var cur = q.shift();
+      (adj[cur] || []).forEach(function (nx) {
+        if (depth[nx] == null) { depth[nx] = depth[cur] + 1; q.push(nx); }
+      });
+    }
+    var byDepth = Object.create(null), maxD = 0;
+    map.nodes.forEach(function (n) {
+      if (depth[n.id] == null) depth[n.id] = 1;
+      maxD = Math.max(maxD, depth[n.id]);
+      (byDepth[depth[n.id]] = byDepth[depth[n.id]] || []).push(n);
+    });
+    var LANES = [[50], [26, 74], [26, 50, 74]];
+    var step = maxD > 1 ? (84 - 24) / (maxD - 1) : 0;
+    map.nodes.forEach(function (n) {
+      var d = depth[n.id];
+      if (n.id === map.startId) { n.x = 8; n.y = 50; return; }
+      if (n.id === map.endId) { n.x = 93; n.y = 50; return; }
+      var col = byDepth[d];
+      n.x = Math.round(24 + (d - 1) * step);
+      n.y = col.length <= 3 ? LANES[Math.min(2, col.length - 1)][Math.min(col.indexOf(n), col.length - 1)] : 50;
+    });
+    map.grid = 1;
   }
 
   /* ============================ SCOUT / REACHABLE ============================ */
@@ -329,6 +368,7 @@ window.IT.map = window.IT.map || {};
 
   /* ============================ EXPORT ============================ */
 
+  M.relayout = relayout;
   M.ScoutCost = 25;   // back-compat constant (floors 1-10 base price)
   M.scoutCost = scoutCost; // v0.5: floor-aware (DARKNESS F11-13 → 50)
   M.gen = gen;
