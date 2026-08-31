@@ -1336,6 +1336,8 @@ function heroSpriteURL(cls, id, marks) {
 
 /* ============================ LOBBY: hero life ============================ */
 var lb = null;   // lobby scene state (independent of the battle's st)
+var LB_HOME = false;   // V0.32: the party walks in ONCE per homecoming — re-renders
+                       // (rest, roster, drawer) must not replay the walk-in
 
 function lbZones(w, h) {
   return {
@@ -1389,10 +1391,11 @@ function lbTickUnit(u, dt, hero, Z) {
   if (u.pinned) {
     if (u.mode === 'walk') {
       var pdx = u.tx - u.x;
-      u.x += Math.sign(pdx) * 14 * dt;
-      if (Math.abs(pdx) < 1) { u.x = u.tx; u.mode = 'stand'; u.wait = 3 + Math.random() * 5; }
+      u.x += Math.sign(pdx) * 64 * dt;   /* V0.32: brisk road walk-in */
+      if (Math.abs(pdx) < 1) { u.x = u.tx; u.mode = 'stand'; u.wait = 3 + Math.random() * 5; LB_HOME = true; }
       return;
     }
+    LB_HOME = true;
     u.wait -= dt;
     if (u.wait > 0) return;
     if (Math.random() < 0.35) {
@@ -1456,17 +1459,19 @@ function lbDrawFig(ctx, u, t) {
   var y = u.y + (u.mode === 'sit' ? 5 : 0);
   if (u.act === 'mem' && u.mode !== 'walk') y += 2 + Math.max(0, Math.sin(t * 0.8 + u.phase)) * 2;
   else y += Math.sin(t * 2 + u.phase) * 1.5;
+  var w0 = spr.w * u.sc, h0 = spr.h * u.sc;
   ctx.save();
   ctx.globalAlpha = u.alpha || 1;
-  ctx.fillStyle = 'rgba(0,0,0,.4)';
-  ctx.beginPath(); ctx.ellipse(u.x, u.y + 22, 14, 4, 0, 0, 6.283); ctx.fill();
+  /* V0.32 grounding: the shadow sits at the FEET (sprite half-height below
+     the anchor), scales with the figure, and never bobs with the breath */
+  ctx.fillStyle = 'rgba(20,15,8,.38)';
+  ctx.beginPath(); ctx.ellipse(u.x, u.y + h0 / 2 + 1, w0 * 0.30, 3.2, 0, 0, 6.283); ctx.fill();
   if (lb && lb.sel === u) {
     ctx.strokeStyle = C.gold; ctx.lineWidth = 2;
     ctx.globalAlpha = 0.55 + 0.45 * Math.sin(t * 6);
-    ctx.beginPath(); ctx.arc(u.x, y - 6, 26, 0, 6.283); ctx.stroke();
+    ctx.beginPath(); ctx.arc(u.x, u.y, h0 / 2 + 5, 0, 6.283); ctx.stroke();
     ctx.globalAlpha = u.alpha || 1;
   }
-  var w0 = spr.w * u.sc, h0 = spr.h * u.sc;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(spr.c, Math.round(u.x - w0 / 2), Math.round(y - h0 / 2), w0, h0);
   if (u.act === 'social' && u.mode !== 'walk' && Math.floor(t * 2 + u.phase) % 2 === 0) {
@@ -1484,50 +1489,84 @@ function lbDrawFig(ctx, u, t) {
    (fire plaza, crates, rack) and BOTTOM (training, rest, wagon, trees). */
 function lbDrawProps(ctx, Z, t, memCount) {
   var w = lb.w, h = lb.h, baseY = Z.tower.y;
-  function hut(x, y, fw, fh, lit) {
-    /* V0.19 chunky: 3-tone roof bands, 2-tone planks, framed window, chimney */
-    var wxm = x + fw / 2;
-    /* roof: dark under-eave → mid → ridge light, with an outline edge */
-    ctx.fillStyle = '#1c1610';
+  function hut(x, y, fw, fh, lit, tone) {
+    /* V0.32 rebuild: a real little house — stone footing, corner posts,
+       shingled roof with a ridge cap and eave shadow, a proper door with
+       a lintel and step, shutters + flower box on the lit window.
+       Still pure chunky rects; tone param keeps the two huts distinct. */
+    var T = tone || { r1: '#1c1610', r2: '#3a2d20', r3: '#4d3c2a', edge: '#5a4732', wall: '#4a3a28', plank: '#3a2c1e' };
+    var wxm = x + fw / 2, wt = y - fh;   // wall top
+    /* stone footing: the house sits ON the ground */
+    for (var st = 0; st < fw; st += 6) {
+      R(ctx, x + st, y - 5, 6, 5, (st / 6) % 2 ? '#3b3830' : '#312e28');
+    }
+    R(ctx, x - 1, y - 6, fw + 2, 1, '#45413a');
+    R(ctx, x - 2, y, fw + 4, 1, 'rgba(0,0,0,.35)');           // footing shadow
+    /* walls: planks, corner posts, top light, seams */
+    R(ctx, x, wt, fw, fh - 5, T.wall);
+    R(ctx, x, wt, fw, 2, T.edge);
+    for (var p = 5; p < fw - 2; p += 7) R(ctx, x + p, wt + 3, 1, fh - 9, T.plank);
+    R(ctx, x, wt, 2, fh - 5, T.plank);                          // corner posts
+    R(ctx, x + fw - 2, wt, 2, fh - 5, T.plank);
+    R(ctx, x - 1, wt, 1, fh - 5, 'rgba(0,0,0,.28)');            // side shade
+    /* door: frame, panel, lintel, gold handle, stone step */
+    var dx1 = Math.round(wxm - 6);
+    R(ctx, dx1 - 1, wt + 5, 14, fh - 10, '#1a130c');
+    R(ctx, dx1, wt + 6, 12, fh - 11, '#4a3826');
+    R(ctx, dx1 + 1, wt + 7, 10, 1, '#5a4530');
+    R(ctx, dx1 + 1, wt + 8, 2, fh - 14, 'rgba(255,220,160,.08)');   // light from inside
+    R(ctx, dx1 + 9, wt + 6 + (fh - 11) / 2, 2, 2, '#e8b04b');
+    R(ctx, dx1 - 2, wt + 4, 16, 2, T.edge);                     // lintel
+    R(ctx, dx1 - 1, y - 6, 16, 2, '#45413a');                   // step
+    /* roof: eave shadow → 3 bands → ridge cap; shingle notches on each band */
+    ctx.fillStyle = T.r1;
     ctx.beginPath();
-    ctx.moveTo(x - 6, y - fh); ctx.lineTo(wxm, y - fh - 14); ctx.lineTo(x + fw + 6, y - fh);
+    ctx.moveTo(x - 7, wt); ctx.lineTo(wxm, wt - 16); ctx.lineTo(x + fw + 7, wt);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#3a2d20';
+    ctx.fillStyle = T.r2;
     ctx.beginPath();
-    ctx.moveTo(x - 4, y - fh); ctx.lineTo(wxm, y - fh - 12); ctx.lineTo(x + fw + 4, y - fh);
+    ctx.moveTo(x - 5, wt); ctx.lineTo(wxm, wt - 13); ctx.lineTo(x + fw + 5, wt);
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#4d3c2a';
+    ctx.fillStyle = T.r3;
     ctx.beginPath();
-    ctx.moveTo(x + 3, y - fh - 2); ctx.lineTo(wxm, y - fh - 12); ctx.lineTo(x + fw - 3, y - fh - 2);
+    ctx.moveTo(x + 3, wt - 2); ctx.lineTo(wxm, wt - 13); ctx.lineTo(x + fw - 3, wt - 2);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#5a4732'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x - 2, y - fh - 1); ctx.lineTo(wxm, y - fh - 11); ctx.lineTo(x + fw + 2, y - fh - 1); ctx.stroke();
-    /* chimney */
-    R(ctx, x + fw - 12, y - fh - 10, 6, 8, '#3a332c');
-    R(ctx, x + fw - 12, y - fh - 10, 6, 2, '#4a4440');
-    /* wall planks, 2-tone + seams */
-    R(ctx, x, y - fh, fw, fh, '#4a3a28');
-    R(ctx, x, y - fh, fw, 2, '#5a4732');                     // top light
-    R(ctx, x, y - 3, fw, 3, '#332818');                      // ground shadow
-    for (var p = 5; p < fw; p += 7) R(ctx, x + p, y - fh + 3, 1, fh - 6, '#3a2c1e');
-    /* door */
-    R(ctx, x + 5, y - fh + 6, 8, fh - 6, '#241b12');
-    R(ctx, x + 6, y - fh + 7, 6, fh - 8, '#31251a');
-    R(ctx, x + 11, y - fh / 2, 1, 1, '#c99a3f');
-    /* window: dark frame + warm panes + mullion cross */
-    R(ctx, x + fw - 14, y - fh + 5, 9, 9, '#1c1610');
+    ctx.strokeStyle = T.edge; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x - 2, wt - 1); ctx.lineTo(wxm, wt - 12); ctx.lineTo(x + fw + 2, wt - 1); ctx.stroke();
+    for (var sh = x + 4; sh < x + fw - 4; sh += 6) {            // shingle seams
+      var shk = (sh - x) / fw;
+      R(ctx, sh, wt - 3 - shk * 8, 1, 4, 'rgba(0,0,0,.34)');
+      R(ctx, sh + 3, wt - 6 - shk * 6, 1, 2, 'rgba(255,235,200,.12)');
+    }
+    R(ctx, wxm - 4, wt - 17, 8, 3, T.edge);                     // ridge cap
+    R(ctx, wxm - 4, wt - 17, 8, 1, shade(T.edge, 0.25));
+    R(ctx, x - 7, wt, fw + 14, 2, 'rgba(0,0,0,.30)');           // eave shadow on wall
+    /* chimney with a cap */
+    R(ctx, x + fw - 14, wt - 12, 7, 10, '#3a332c');
+    R(ctx, x + fw - 15, wt - 13, 9, 2, '#4a4440');
+    /* window: frame, shutters, mullion, flower box under the panes */
+    var wxx = x + fw - 15, wyy = wt + 5;
+    R(ctx, wxx - 3, wyy, 15, 11, '#1a130c');
+    R(ctx, wxx - 2, wyy + 1, 2, 9, T.plank);                    // shutters
+    R(ctx, wxx + 11, wyy + 1, 2, 9, T.plank);
     if (lit) {
       var fl2 = 0.75 + 0.25 * Math.sin(t * 5 + x);
-      R(ctx, x + fw - 13, y - fh + 6, 7, 7, 'rgba(240,170,80,' + fl2.toFixed(2) + ')');
-      R(ctx, x + fw - 10, y - fh + 6, 1, 7, '#1c1610');
-      R(ctx, x + fw - 13, y - fh + 9, 7, 1, '#1c1610');
-      R(ctx, x + fw - 12, y - fh + 7, 1, 1, 'rgba(255,230,170,' + fl2.toFixed(2) + ')');
-      var wg = ctx.createRadialGradient(x + fw - 10, y - fh + 9, 2, x + fw - 10, y - fh + 9, 20);
+      R(ctx, wxx + 1, wyy + 1, 9, 9, 'rgba(240,170,80,' + fl2.toFixed(2) + ')');
+      R(ctx, wxx + 5, wyy + 1, 1, 9, '#1a130c');
+      R(ctx, wxx + 1, wyy + 5, 9, 1, '#1a130c');
+      R(ctx, wxx + 2, wyy + 2, 1, 1, 'rgba(255,230,170,' + fl2.toFixed(2) + ')');
+      var wg = ctx.createRadialGradient(wxx + 5, wyy + 5, 2, wxx + 5, wyy + 5, 22);
       wg.addColorStop(0, 'rgba(232,160,75,.22)'); wg.addColorStop(1, 'rgba(232,160,75,0)');
       ctx.fillStyle = wg;
-      ctx.beginPath(); ctx.arc(x + fw - 10, y - fh + 9, 20, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(wxx + 5, wyy + 5, 22, 0, 6.283); ctx.fill();
+      /* flower box: green frill + three tiny blooms */
+      R(ctx, wxx, wyy + 11, 11, 2, '#3c2f20');
+      R(ctx, wxx + 1, wyy + 10, 9, 1, '#2f4a2e');
+      R(ctx, wxx + 2, wyy + 9, 1, 1, '#c95f6e');
+      R(ctx, wxx + 5, wyy + 9, 1, 1, '#e8c56b');
+      R(ctx, wxx + 8, wyy + 9, 1, 1, '#8fb4d9');
     } else {
-      R(ctx, x + fw - 13, y - fh + 6, 7, 7, '#241b12');
+      R(ctx, wxx + 1, wyy + 1, 9, 9, '#241b12');
     }
   }
   function tree(x, y, s) {
@@ -1543,16 +1582,35 @@ function lbDrawProps(ctx, Z, t, memCount) {
     }
     R(ctx, x - 1, y - 7, n * 9, 1, '#54402a');
   }
+  /* V0.32: the object halo — a warm, breathing pixel glow at the BASE of
+     each landmark (not the label). One shared grammar: halo + glint + plate
+     = "this place is tappable". Phase offset by x so nothing syncs. */
+  function halo(x, y, r) {
+    var p = 0.5 + 0.5 * Math.sin(t * 1.8 + x * 0.13);
+    var hg2 = ctx.createRadialGradient(x, y, 2, x, y, r);
+    hg2.addColorStop(0, 'rgba(232,176,75,' + (0.08 + 0.05 * p).toFixed(3) + ')');
+    hg2.addColorStop(1, 'rgba(232,176,75,0)');
+    ctx.fillStyle = hg2;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+  }
 
   /* BACK ROW — huts flanking the tower's base, dark trees behind them */
   tree(w * 0.015, baseY + 10, 1.15);
   tree(w * 0.985, baseY + 10, 1.15);
-  hut(w * 0.045, baseY + 14, 44, 24, true);          // left hut
-  hut(w * 0.955 - 46, baseY + 16, 46, 24, true);     // right hut
+  hut(w * 0.045, baseY + 14, 52, 30, true);          // left hut — warm umber
+  hut(w * 0.955 - 54, baseY + 16, 54, 30, true,      // right hut — weathered slate
+    { r1: '#161b20', r2: '#2e3a46', r3: '#3d4c5c', edge: '#4a5a6a', wall: '#43423e', plank: '#36352f' });
   fence(w * 0.045, baseY + 40, 3);
   fence(w * 0.955 - 30, baseY + 42, 3);
+  /* V0.32 depth: cool haze over the back rows — mid village recedes, the
+     fire plaza and the party keep their warmth (atmospheric perspective) */
+  var hz = ctx.createLinearGradient(0, baseY - 6, 0, h * 0.9);
+  hz.addColorStop(0, 'rgba(196,205,216,.15)');
+  hz.addColorStop(1, 'rgba(196,205,216,0)');
+  ctx.fillStyle = hz; ctx.fillRect(0, baseY - 6, w, h * 0.9 - baseY + 6);
 
   /* MID ROW — MEMORIAL GROVE (left): trees shade the stones */
+  halo(Z.mem.x, Z.mem.y + 2, 36);
   tree(Z.mem.x - 26, Z.mem.y + 6, 0.9);
   tree(Z.mem.x + 26, Z.mem.y + 6, 0.9);
   var mi;
@@ -1561,7 +1619,16 @@ function lbDrawProps(ctx, Z, t, memCount) {
     R(ctx, Z.mem.x - 8 + mi * 8, Z.mem.y + 4, 5, 2, '#7a828c');
     R(ctx, Z.mem.x - 9 + mi * 8, Z.mem.y + 14, 7, 2, '#39424c');
   }
+  /* V0.32 affordance: a vigil flame on the center stone */
+  var mf = 0.7 + 0.3 * Math.sin(t * 7 + Math.sin(t * 3));
+  R(ctx, Z.mem.x - 1, Z.mem.y + 1, 3, 3, 'rgba(232,160,75,' + (0.55 * mf + 0.35).toFixed(2) + ')');
+  R(ctx, Z.mem.x, Z.mem.y - 1, 1, 2, '#ffe9b0');
+  var mgd = ctx.createRadialGradient(Z.mem.x, Z.mem.y + 2, 1, Z.mem.x, Z.mem.y + 2, 12);
+  mgd.addColorStop(0, 'rgba(255,190,110,.22)'); mgd.addColorStop(1, 'rgba(255,190,110,0)');
+  ctx.fillStyle = mgd;
+  ctx.beginPath(); ctx.arc(Z.mem.x, Z.mem.y + 2, 12, 0, 6.283); ctx.fill();
   /* MID ROW — WORKSHOP + STORAGE (right): lean-to, anvil, crates, barrels */
+  halo(Z.work.x, Z.work.y - 8, 38);
   var wx0 = Math.round(Z.work.x), wy0 = Math.round(Z.work.y);
   R(ctx, wx0 - 16, wy0 - 28, 34, 2, '#3c2f20');
   R(ctx, wx0 - 16, wy0 - 28, 2, 14, '#3c2f20');
@@ -1600,12 +1667,19 @@ function lbDrawProps(ctx, Z, t, memCount) {
   R(ctx, fz.x + 52, fz.y - 2, 11, 4, '#54402a');
 
   /* BOTTOM ROW — TRAINING (lower-left), REST (lower-right) */
+  halo(Z.train.x, Z.train.y - 8, 32);
   var dx0 = Math.round(Z.train.x), dy0 = Math.round(Z.train.y);
   R(ctx, dx0 - 1, dy0 - 20, 3, 22, WOOD);
-  R(ctx, dx0 - 7, dy0 - 14, 15, 2, WOOD);
-  R(ctx, dx0 - 3, dy0 - 24, 7, 5, '#a8865a');
   R(ctx, dx0 - 5, dy0, 11, 3, '#3a3326');
+  /* V0.32 affordance: the dummy takes hits — head+arms sway on the post */
+  ctx.save();
+  ctx.translate(dx0, dy0 - 14);
+  ctx.rotate(Math.sin(t * 1.1) * 0.08);
+  R(ctx, -7, -1, 15, 2, WOOD);
+  R(ctx, -4, -10, 8, 5, '#a8865a');
+  ctx.restore();
   fence(dx0 + 14, dy0 + 4, 3);
+  halo(Z.rest.x, Z.rest.y - 6, 32);
   var rx0 = Math.round(Z.rest.x), ry0 = Math.round(Z.rest.y);
   R(ctx, rx0 - 24, ry0 - 18, 48, 2, '#3c2f20');
   R(ctx, rx0 - 24, ry0 - 18, 2, 20, '#3c2f20');
@@ -1614,6 +1688,10 @@ function lbDrawProps(ctx, Z, t, memCount) {
   R(ctx, rx0 - 20, ry0 - 4, 4, 6, '#8b94a7');
   R(ctx, rx0 + 2, ry0 - 4, 18, 6, '#3d4a5c');
   R(ctx, rx0 + 2, ry0 - 4, 4, 6, '#8b94a7');
+  /* V0.32 affordance: warm breathing over the bedrolls */
+  var rp = 0.10 + 0.06 * Math.sin(t * 1.5);
+  ctx.fillStyle = 'rgba(232,170,90,' + rp.toFixed(3) + ')';
+  ctx.fillRect(rx0 - 20, ry0 - 5, 40, 8);
   /* the wagon at the village bottom edge + frame trees/bushes */
   R(ctx, w * 0.06, h * 0.965, 26, 6, '#54402a');
   R(ctx, w * 0.06 + 3, h * 0.958, 20, 2, '#3c2f20');
@@ -1629,16 +1707,41 @@ function lbDrawProps(ctx, Z, t, memCount) {
   R(ctx, w * 0.12, h * 0.70, 12, 4, '#223526');
   R(ctx, w * 0.88, h * 0.68, 12, 4, '#2b4230');
 
-  /* quiet captions */
+  /* quiet captions — V0.32 interactive-landmark grammar:
+     ◆ + label on a small dark plate, so the label floats ABOVE the scene
+     instead of being written on the grass. Same shape at every place. */
   ctx.font = '6px ' + PIXEL;
-  ctx.fillStyle = 'rgba(139,148,167,.7)';
   ctx.textAlign = 'center';
-  ctx.fillText('TRAINING', Z.train.x, Z.train.y + 20);
-  ctx.fillText('WORKSHOP', Z.work.x, Z.work.y + 18);
-  ctx.fillText('REST', Z.rest.x, Z.rest.y + 16);
-  ctx.fillText('MEMORIAL', Z.mem.x, Z.mem.y + 26);
-  ctx.fillStyle = 'rgba(215,220,230,.85)';
-  ctx.fillText('▸ THE TOWER', Z.tower.x, Z.tower.y + 20);
+  function diamond(x, y) {
+    R(ctx, x - 1, y - 5, 2, 1, '#e8b04b');
+    R(ctx, x - 2, y - 4, 4, 2, '#e8b04b');
+    R(ctx, x - 1, y - 2, 2, 1, '#e8b04b');
+  }
+  function cap(lab, x, y) {
+    var tw = ctx.measureText(lab).width;
+    var px0 = Math.round(x - tw / 2 - 11), pw = Math.round(tw + 24);
+    ctx.fillStyle = 'rgba(9,11,17,.60)';
+    roundRect(ctx, px0, y - 9, pw, 12, 3); ctx.fill();
+    ctx.strokeStyle = 'rgba(232,176,75,.30)'; ctx.lineWidth = 1;
+    roundRect(ctx, px0 + 0.5, y - 8.5, pw - 1, 11, 3); ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#d8dce4';
+    ctx.fillText(lab, px0 + 14, y);
+    ctx.textAlign = 'center';
+    diamond(px0 + 6, y - 2);
+  }
+  cap('TRAINING', Z.train.x, Z.train.y + 20);
+  cap('WORKSHOP', Z.work.x, Z.work.y + 18);
+  cap('REST', Z.rest.x, Z.rest.y + 16);
+  cap('MEMORIAL', Z.mem.x, Z.mem.y + 26);
+  cap('THE TOWER', Z.tower.x, Z.tower.y + 22);
+  /* the tower's caption points — it is the destination */
+  (function () {
+    var ax = Math.round(Z.tower.x), ay = Math.round(Z.tower.y + 10);
+    R(ctx, ax - 1, ay - 4, 2, 1, '#e8b04b');
+    R(ctx, ax - 2, ay - 3, 4, 1, '#e8b04b');
+    R(ctx, ax - 3, ay - 2, 6, 1, '#e8b04b');
+  })();
 }
 
 function lbFrame(now) {
@@ -1674,6 +1777,21 @@ function lbFrame(now) {
     sun.addColorStop(0.25, 'rgba(255,190,120,.22)');
     sun.addColorStop(1, 'rgba(255,190,120,0)');
     ctx.fillStyle = sun; ctx.fillRect(0, 0, w, h);
+    /* V0.32: slow god-rays off the low sun — the morning is alive */
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (var ray = 0; ray < 3; ray++) {
+      var ra = (ray * 2.1 + t * 0.05) % 6.283;
+      var rgd = ctx.createLinearGradient(sunX, sunY, sunX + Math.cos(ra) * h, sunY + Math.sin(ra) * h);
+      rgd.addColorStop(0, 'rgba(255,220,170,.09)'); rgd.addColorStop(1, 'rgba(255,220,170,0)');
+      ctx.fillStyle = rgd;
+      ctx.beginPath();
+      ctx.moveTo(sunX, sunY);
+      ctx.lineTo(sunX + Math.cos(ra - 0.09) * h * 1.3, sunY + Math.sin(ra - 0.09) * h * 1.3);
+      ctx.lineTo(sunX + Math.cos(ra + 0.09) * h * 1.3, sunY + Math.sin(ra + 0.09) * h * 1.3);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
     /* thin dawn clouds */
     ctx.fillStyle = 'rgba(255,220,190,.16)';
     for (var cl = 0; cl < 3; cl++) {
@@ -1749,9 +1867,13 @@ function lbFrame(now) {
       ctx.fillStyle = '#2c343d';
       ctx.fillRect(ex - ew - 10, ey + 4, ew * 2 + 20, 4);
       var doorG = ctx.createRadialGradient(ex, ey - 12, 2, ex, ey - 12, 30);
-      doorG.addColorStop(0, 'rgba(160,190,220,.18)'); doorG.addColorStop(1, 'rgba(160,190,220,0)');
+      /* V0.32: the door breathes dread-red — the same red as the gate sigils
+         down in the dungeon; the village knows what it lives beside */
+      var dread = 0.5 + 0.5 * Math.sin(t * 0.9);
+      doorG.addColorStop(0, 'rgba(224,82,99,' + (0.14 + 0.10 * dread).toFixed(2) + ')');
+      doorG.addColorStop(1, 'rgba(224,82,99,0)');
       ctx.fillStyle = doorG;
-      ctx.beginPath(); ctx.arc(ex, ey - 12, 22, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex, ey - 12, 26, 0, 6.283); ctx.fill();
     })();
     /* mist takes only the tower's crown */
     var mist = ctx.createLinearGradient(0, 0, 0, baseY * 0.75);
@@ -1779,6 +1901,16 @@ function lbFrame(now) {
       if (Math.abs(gx - TX) < 22 && gy < baseY + 40) continue;   // keep the gate's steps clear
       ctx.fillRect(Math.round(gx), Math.round(gy), 3, 1);
       ctx.fillRect(Math.round(gx) + 1, Math.round(gy) - 1, 1, 2);
+    }
+    /* V0.32: wildflowers — the village is lived-in, not surviving */
+    var petals = ['#e8c56b', '#c95f6e', '#8fb4d9'];
+    for (var fl3 = 0; fl3 < 12; fl3++) {
+      var fx3 = (fl3 * 97.3 + 31) % w, fy3 = floorTop + 14 + ((fl3 * 53.1) % (h - floorTop - 28));
+      if (Math.abs(fx3 - TX) < 44 && fy3 < h * 0.9) continue;    // not on the road
+      ctx.fillStyle = petals[fl3 % 3];
+      ctx.fillRect(Math.round(fx3), Math.round(fy3), 2, 2);
+      ctx.fillStyle = 'rgba(255,245,220,.8)';
+      ctx.fillRect(Math.round(fx3), Math.round(fy3), 1, 1);
     }
     /* dirt worn bare around the facilities and the road edge */
     ctx.fillStyle = 'rgba(58,53,40,.45)';
@@ -1843,6 +1975,36 @@ function lbFrame(now) {
       ctx.fillText('🪦 ' + S.memorial.length, Z.mem.x, Z.mem.y - 52);
     }
 
+    /* ---- V0.32: every tappable place wears a glint. A small gold spark
+       pulses above each zone, phase-offset so the village twinkles softly
+       — the world says "press me" without a single UI button. ---- */
+    function zoneGlint(x, y, ph) {
+      var kk = (Math.sin(t * 2.6 + ph) + 1) / 2;
+      var a = 0.40 + 0.60 * Math.pow(kk, 2.4);   /* always visible; it breathes */
+      var s = 2.6 + 2.6 * Math.pow(kk, 2.4);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = '#ffe9b0'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - s, y); ctx.lineTo(x + s, y);
+      ctx.moveTo(x, y - s); ctx.lineTo(x, y + s);
+      ctx.stroke();
+      ctx.fillStyle = '#e8b04b';
+      ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+      ctx.globalAlpha = a * 0.5;
+      var gg = ctx.createRadialGradient(x, y, 1, x, y, s * 3);
+      gg.addColorStop(0, 'rgba(255,233,176,.6)'); gg.addColorStop(1, 'rgba(255,233,176,0)');
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(x, y, s * 3, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
+    zoneGlint(Z.train.x + 12, Z.train.y - 34, 0.0);
+    zoneGlint(Z.work.x - 14, Z.work.y - 36, 1.3);
+    zoneGlint(Z.rest.x - 18, Z.rest.y - 30, 2.6);
+    zoneGlint(Z.mem.x - 12, Z.mem.y - 8, 3.9);
+    zoneGlint(Z.fire.x + 30, Z.fire.y - 14, 5.2);
+    zoneGlint(TX, baseY - 10, 6.5);   /* the gate — brightest of all */
+
     /* ---- firepit (the plaza landmark) ---- */
     var fx = Z.fire.x, fy = Z.fire.y + 6;
     ctx.fillStyle = '#232a3a';
@@ -1873,6 +2035,25 @@ function lbFrame(now) {
           vy: -7 - Math.random() * 5, life: 1, decay: 0.35,
           size: 2 + Math.random() * 2, color: 'rgba(120,128,138,.28)', soft: true });
       }
+      /* V0.32 affordance: the workshop lives too — smoke off the lean-to,
+         a slow spark off the anvil even when no one is working it */
+      if (Math.random() < 0.30) {
+        lb.parts.push({ x: Z.work.x + 12, y: Z.work.y - 30, vx: (Math.random() - 0.5) * 5,
+          vy: -6 - Math.random() * 4, life: 1, decay: 0.3,
+          size: 2 + Math.random() * 2, color: 'rgba(120,128,138,.25)', soft: true });
+      }
+      if (Math.random() < 0.06) {
+        lb.parts.push({ x: Z.work.x - 4, y: Z.work.y - 9, vx: (Math.random() - 0.5) * 30,
+          vy: -26 - Math.random() * 10, life: 1, decay: 2.6, size: 1.5,
+          color: '#ffd98c', soft: false });
+      }
+      /* V0.32: breeze-borne petals crossing the village */
+      if (Math.random() < 0.05) {
+        lb.parts.push({ x: -4, y: floorTop + 20 + Math.random() * (h - floorTop - 60),
+          vx: 10 + Math.random() * 8, vy: -3 + Math.random() * 6,
+          life: 1, decay: 0.09, size: 2,
+          color: 'rgba(222,204,158,.55)', soft: true, drift: true });
+      }
     }
 
     /* ---- heroes: THE PARTY is staged center-foreground; the bench lives
@@ -1885,13 +2066,22 @@ function lbFrame(now) {
         .sort(function (a, b) { return (b.lvl || 1) - (a.lvl || 1); }).slice(0, 4);
       var actors = party.concat(bench);
 
-      /* the staging ground: stone slabs + a warm pool — this spot is theirs */
+      /* the staging ground: stone slabs + a warm pool — this spot is theirs.
+         V0.32: the party is a portrait IN the world — ~25% smaller, wider
+         spacing, staggered triangle (center hero forward) so each figure
+         owns its space on the road instead of stacking into one blob. */
       var stageY = fy + 34;
+      function stageSlot(i, n) {
+        return {
+          x: fx + (i - (n - 1) / 2) * 78,
+          y: stageY + (n === 3 ? (i === 1 ? 10 : -6) : (i % 2 ? 6 : -4))
+        };
+      }
       if (party.length) {
         ctx.fillStyle = 'rgba(92,86,66,.6)';
         for (var si = 0; si < party.length; si++) {
-          var sx2 = fx + (si - (party.length - 1) / 2) * 64;
-          roundRect(ctx, sx2 - 27, stageY + 16, 54, 14, 4); ctx.fill();
+          var sl = stageSlot(si, party.length);
+          roundRect(ctx, sl.x - 22, sl.y + 3, 44, 10, 4); ctx.fill();
         }
         var pg = ctx.createRadialGradient(fx, stageY + 8, 8, fx, stageY + 8, 100);
         pg.addColorStop(0, 'rgba(232,170,90,.14)');
@@ -1900,23 +2090,29 @@ function lbFrame(now) {
         ctx.beginPath(); ctx.arc(fx, stageY + 8, 100, 0, 6.283); ctx.fill();
       }
 
+      var partyQ = [];   /* drawn after the bench, back row first */
       actors.forEach(function (hero) {
         var inParty = (S.party || []).indexOf(hero.id) >= 0;
         var u = lb.units['u' + hero.id];
         if (!u) {
           var mk1 = { legacy: !!hero.legacy, pact: !!hero.pact, brand: !!hero.branded };
           if (inParty) {
-            /* party walks IN to their stage slot */
-            var slotX = fx + (party.indexOf(hero) - (party.length - 1) / 2) * 64;
+            /* party walks IN along the road — but only on a real homecoming;
+               every lobby re-render spawns them already on their slabs */
+            var pIdx = party.indexOf(hero);
+            var slot = stageSlot(pIdx, party.length);
+            var spr0 = makeHeroSprite(hero.cls, hero.id, 'idle0', mk1);
             u = lb.units['u' + hero.id] = {
               id: hero.id, name: hero.name, inParty: true, pinned: true,
-              alpha: 1, sc: 5.5,
-              sprs: { idle0: makeHeroSprite(hero.cls, hero.id, 'idle0', mk1),
+              alpha: 1, sc: 4.2,
+              sprs: { idle0: spr0,
                       idle1: makeHeroSprite(hero.cls, hero.id, 'idle1', mk1),
                       atk: makeHeroSprite(hero.cls, hero.id, 'atk', mk1) },
-              x: slotX, y: stageY - 34, tx: slotX, ty: stageY,
+              x: LB_HOME ? slot.x : fx - w * 0.55 - pIdx * 26,
+              tx: slot.x,
               act: 'fire', swing: 0, swingT: 1,
-              mode: 'walk', wait: Math.random() * 3, phase: Math.random() * 6.28
+              mode: LB_HOME ? 'stand' : 'walk',
+              wait: Math.random() * 3, phase: Math.random() * 6.28
             };
           } else {
             var sp0 = lbFindSpot(Z.fire.x, Z.fire.y, null);
@@ -1934,19 +2130,30 @@ function lbFrame(now) {
         }
         if (inParty) {   /* keep the slot true if the party order changed */
           u.pinned = true;
-          u.hx = fx + (party.indexOf(hero) - (party.length - 1) / 2) * 64;
-          u.hy = stageY + (party.indexOf(hero) === 1 ? 5 : 0);
+          var sl2 = stageSlot(party.indexOf(hero), party.length);
+          u.hx = sl2.x;
+          u.hy = sl2.y;
+          /* feet pinned to the ground line — anchor is sprite center, so
+             offset by half the drawn height (breathing bobs around this) */
+          u.footOff = (u.sprs.idle0.h * u.sc) / 2;
+          u.y = u.hy - u.footOff;
         } else {
           u.pinned = false;
           u.inParty = false;
         }
         lbTickUnit(u, dt, hero, Z);
+        if (inParty) partyQ.push(u);
+        else lbDrawFig(ctx, u, t);
+      });
+      partyQ.sort(function (a, b) { return a.hy - b.hy; }).forEach(function (u) {
         lbDrawFig(ctx, u, t);
-        if (inParty) {   /* the party wears their names */
-          ctx.font = '7px ' + PIXEL;
-          ctx.fillStyle = u === lb.sel ? C.gold : '#f0ead8';
-          ctx.fillText(u.name.toUpperCase(), u.x, u.y + 38);
-        }
+        ctx.font = '7px ' + PIXEL;   /* the party wears their names — with a
+                                       dark backing so grass can't eat them */
+        var nm = u.name.toUpperCase();
+        ctx.fillStyle = 'rgba(14,11,7,.8)';
+        ctx.fillText(nm, u.x + 1, u.hy + 17);
+        ctx.fillStyle = u === lb.sel ? C.gold : '#f5efdc';
+        ctx.fillText(nm, u.x, u.hy + 16);
       });
       /* drop units that left the roster */
       var live2 = {};
@@ -1960,6 +2167,7 @@ function lbFrame(now) {
       q.life -= q.decay * dt;
       if (q.life <= 0) { lb.parts.splice(pi, 1); continue; }
       q.x += q.vx * dt; q.y += q.vy * dt; q.vy -= 4 * dt;
+      if (q.drift) q.y += Math.sin(q.life * 7) * 10 * dt;   /* petals ride the breeze */
       ctx.globalAlpha = Math.max(0, q.life);
       ctx.fillStyle = q.color;
       ctx.fillRect(Math.round(q.x), Math.round(q.y), Math.max(1, Math.round(q.size)), Math.max(1, Math.round(q.size)));
@@ -2067,7 +2275,9 @@ function lobbyResize() {
     lb.dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === 'number') ? devicePixelRatio : 1));
     lb.canvas.width = Math.round(w * lb.dpr); lb.canvas.height = Math.round(h * lb.dpr);
     lb.canvas.style.height = h + 'px';
-    lb.units = {};   /* px slot positions are stale — heroes re-walk to new spots */
+    /* units keep their spots — the party re-pins to its ground line every
+       frame, and a resize (toolbar collapse, rotation) must not replay the
+       walk-in */
   } catch (e) { /* keep last size */ }
 }
 function lobbyAttach(root, onTap, onZone) {
@@ -2432,6 +2642,7 @@ function dungeonDetach() {
 
 return { attach: attach, heroSpriteURL: heroSpriteURL,
          lobbyAttach: lobbyAttach, lobbyDetach: lobbyDetach,
-         dungeonAttach: dungeonAttach, dungeonDetach: dungeonDetach };
+         dungeonAttach: dungeonAttach, dungeonDetach: dungeonDetach,
+         lobbyLeft: function () { LB_HOME = false; } };
 
 })();

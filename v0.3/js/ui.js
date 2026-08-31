@@ -654,9 +654,20 @@ function buySupply(k){
   var svq=core('save'); if(svq) svq.call(IT);
   UI.updateHeader();
 }
-/* V0.16: PREPARE — the supplies sheet over the hall */
+/* V0.16: PREPARE — the supplies sheet over the hall.
+   V0.32: a small read-only party strip on top — the sheet answers
+   "who am I packing for?" at a glance; party changes stay in the hall. */
 function supSheet(){
-  UI.overlay('<h3>🎒 PREPARE</h3><div class="supshop inlay">'+supShopHtml()+'</div>',
+  var s=S();
+  var chips='';
+  if(s&&(s.party||[]).length){
+    chips=(s.party||[]).map(function(pid){
+      var h=heroById(pid); if(!h) return '';
+      return '<span class="sup-chip">'+heroSpriteHtml(h)+'<b>'+esc(h.name)+'</b></span>';
+    }).join('');
+    chips='<div class="sup-party"><span class="sup-party-lab">FOR THE CLIMB</span>'+chips+'</div>';
+  }
+  UI.overlay('<h3>🎒 PREPARE</h3>'+chips+'<div class="supshop inlay">'+supShopHtml()+'</div>',
     [{id:'ok',label:'Done',cls:'big gold',cb:function(close){ close(); }}]);
   wireSupBuys(document.getElementById('overlay'));
 }
@@ -874,7 +885,9 @@ RENDER.lobby=function(app){
   if(canCamp){
     /* V0.16: the hall IS the screen — world first, UI on demand */
     html+='<div id="lobby-scene"></div>'+
-      '<div id="hero-drawer" class="drawer-hint">Tap a hero — or a corner of the hall.</div>'+
+      /* V0.32: the drawer hint text is gone — the landmarks speak for
+         themselves; the drawer itself still fills in on a hero tap */
+      '<div id="hero-drawer"></div>'+
       '<div class="lobby-fabs">'+
       '<button class="act" id="b-prepare">🎒 Prepare</button>'+
       '<button class="act gold" id="b-recruit" '+(full?'disabled':'')+'>🎴 Recruit · '+recruitCost()+'g</button>'+
@@ -908,7 +921,6 @@ RENDER.lobby=function(app){
   }
   html+='</div>';
   }
-  html+='<p class="hint" style="text-align:center;margin:2px 0 0">THE EXPEDITION PARTY · <b>'+standing+'/3</b> — tap a companion to open their page</p>';
 
   /* V0.16: master panel lives on the Tower screen now; the hall keeps the world */
   if(!canCamp){
@@ -2250,6 +2262,7 @@ function completeNode(nodeId,flavor){
   var node=(ex.map.nodes||[]).filter(function(n){return n.id===nodeId;})[0]||{id:nodeId};
   node.cleared=true;
   ex.done=ex.done||{}; ex.done[nodeId]=true;
+  ex.roomId=null;   /* V0.32: the room resolved — the route unlocks */
   ex.lastClearedId=nodeId;
   var sv=core('save'); if(sv) sv.call(IT);
   if(flavor) UI.toast(flavor);
@@ -2335,6 +2348,8 @@ var FLOW={
     }
     RUN.deaths=[]; RUN.lvls=[]; RUN.bossFought=false;
     RUN.blindWall=(floor===10 && !(s.knowledge&&s.knowledge.executioner));
+    /* V0.32: leaving the village — the next lobby visit is a homecoming */
+    if(window.IT&&IT.scene&&typeof IT.scene.lobbyLeft==='function') IT.scene.lobbyLeft();
     s.expedition={floor:floor,map:map,curId:map.startId,done:{},
       tally:{gold:0,permits:0,exp:{}},
       dread:0, bank:{gold:0,permits:0}};   /* V0.10: pressure & greed */
@@ -2375,6 +2390,12 @@ var FLOW={
     var node=(ex.map.nodes||[]).filter(function(n){return n.id===id;})[0];
     if(!node){ UI.toast('Unknown node.'); return; }
     if(node.cleared||(ex.done||{})[id]){ UI.toast('Already cleared.'); return; }
+    /* V0.32: the party is inside a room — no rerouting until it resolves
+       (re-tapping the room you're in is allowed: it just re-shows it) */
+    if(ex.roomId&&ex.roomId!==id&&!(ex.done||{})[ex.roomId]){
+      var cur=(ex.map.nodes||[]).filter(function(n){return n.id===ex.roomId;})[0];
+      if(cur){ UI.toast('The party is still in this room — finish it first.'); return; }
+    }
     var reach=mod('map','reachable');
     if(reach){
       try{
@@ -2383,6 +2404,7 @@ var FLOW={
       }catch(e){ hardFail('IT.map.reachable() threw: '+(e&&e.message)); }
     }
     ex.curId=id;
+    ex.roomId=id;   /* V0.32: inside a room — the route locks until it resolves */
     /* V0.10: every step forward feeds the Tower's attention (rest is the
        only relief — handled in showRest) */
     var dAdd={'combat':12,'boss':12,'treasure':7,'event':6,'remains':5}[node.type]||0;

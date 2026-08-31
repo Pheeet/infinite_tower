@@ -178,13 +178,20 @@ window.IT.map = window.IT.map || {};
     });
     var LANES = [[50], [20, 80], [20, 50, 80]];
     var step = maxD > 1 ? (78 - 22) / (maxD - 1) : 0;
+    /* ponytail: any column bigger than 3 lanes spreads evenly across the
+       full 18-82 band — stacking extras at y=50 made them untappable
+       (the button on top swallowed every tap) and read as one node */
+    function laneFor(col, i) {
+      if (col.length <= 3) return LANES[Math.min(2, col.length - 1)][Math.min(i, col.length - 1)];
+      return Math.round(18 + (82 - 18) * i / (col.length - 1));
+    }
     map.nodes.forEach(function (n) {
       var d = depth[n.id];
       if (n.id === map.startId) { n.x = 8; n.y = 50; return; }
       if (n.id === map.endId) { n.x = 92; n.y = 50; return; }
       var col = byDepth[d];
       n.x = Math.round(22 + (d - 1) * step);
-      n.y = col.length <= 3 ? LANES[Math.min(2, col.length - 1)][Math.min(col.indexOf(n), col.length - 1)] : 50;
+      n.y = laneFor(col, col.indexOf(n));
     });
     map.grid = 2;
   }
@@ -299,10 +306,6 @@ window.IT.map = window.IT.map || {};
     if (typeof document === 'undefined' || !map || !containerEl) return;
     injectStyle();
 
-    var reach = M.reachable(map);
-    var reachSet = Object.create(null);
-    reach.forEach(function (id) { reachSet[id] = 1; });
-
     var idx = Object.create(null);
     map.nodes.forEach(function (n) { idx[n.id] = n; });
 
@@ -310,6 +313,19 @@ window.IT.map = window.IT.map || {};
     var g = (typeof IT !== 'undefined') ? IT : window.IT;
     if (g && g.S && g.S.expedition && g.S.expedition.map === map) curId = g.S.expedition.curId || null;
     if (!curId && map.curId) curId = map.curId;
+
+    /* V0.32: a room in progress LOCKS the route — the party is inside;
+       every other node stays dark until this room is resolved. roomId is
+       set on entry (not curId — that marks the gold ring from creation). */
+    var locked = false;
+    if (g && g.S && g.S.expedition && g.S.expedition.map === map) {
+      var rid = g.S.expedition.roomId;
+      locked = !!(rid && idx[rid] && !(g.S.expedition.done || {})[rid]);
+    }
+
+    var reach = locked ? [] : M.reachable(map);
+    var reachSet = Object.create(null);
+    reach.forEach(function (id) { reachSet[id] = 1; });
 
     var html = '<div class="it-mapwrap">';
     html += '<svg class="it-mapsvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">';
@@ -358,6 +374,7 @@ window.IT.map = window.IT.map || {};
       btn.addEventListener('click', function () {
         var n = idx[btn.getAttribute('data-id')];
         if (!n) return;
+        if (locked) return;   // a room is in progress — the route waits
         var now = M.reachable(map); // stale-UI guard
         for (var i = 0; i < now.length; i++) {
           if (now[i] === n.id) { onEnter(n); return; }
