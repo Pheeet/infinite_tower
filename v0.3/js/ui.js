@@ -1056,13 +1056,14 @@ RENDER.lobby=function(app){
             UI.go('lobby');
           };
         }, function(zone){
-          /* V0.16: the hall's corners do things — context, not menus */
-          if(zone==='rest'){ doRestAction(); }
-          else if(zone==='mem'){ IT.flow.openMemorial(); }
+          /* V0.16: the hall's corners do things — context, not menus.
+             V0.32: the four places are rooms now — step into them. */
+          if(zone==='rest'){ UI.go('place',{place:'rest'}); }
+          else if(zone==='mem'){ UI.go('place',{place:'mem'}); }
           else if(zone==='fire'){ supSheet(); }
           else if(zone==='tower'){ IT.flow.openTower(); }   /* V0.18: the door is the destination */
-          else if(zone==='train'){ UI.toast('🥋 Drills, footwork, and the sound of wood on wood.'); }
-          else if(zone==='work'){ UI.toast('⚒ Whetstones, oil, and armor that will matter tomorrow.'); }
+          else if(zone==='train'){ UI.go('place',{place:'train'}); }
+          else if(zone==='work'){ UI.go('place',{place:'work'}); }
         });
       }
     }catch(e){ /* presentation only */ }
@@ -1544,36 +1545,75 @@ RENDER.tower=function(app){
 
 /* ======================= SCREEN: memorial (V0.8 — the plaque wall) =======================
    Existing memorial data, restyled: each entry an arched stone plaque. */
-RENDER.memorial=function(app){
-  var s=S(); if(!s){ app.innerHTML='<p class="hint">State not loaded.</p>'; return; }
-  var html='<h2 class="scr">The Memorial</h2>';
+function memorialHtml(){
+  var s=S(); if(!s) return '<p class="hint">State not loaded.</p>';
   var mem=s.memorial||[];
-  if(!mem.length){
-    html+='<p class="hint">Empty. For now.</p>';
-  }else{
-    html+='<div class="memorial-wall">';
-    mem.forEach(function(m,i){
-      html+='<div class="plaque">'+
-        '<div class="pl-ic">'+pxImg(m.cls,m.id,null,{legacy:(m.returns||0)>0})+'</div>'+
-        '<div class="pl-kicker">GEN '+(i+1)+' · Lv.'+(m.lvl||1)+' '+esc(m.cls)+'</div>'+
-        '<div class="pl-name">'+esc(m.name)+'</div>'+
-        '<div class="dead-tag">✝ FALLEN</div>'+
-        '<div style="margin-top:4px">'+starsHtml(m.rarity)+'</div>'+
-        '<div class="pl-sub">Fell on Floor <b>'+(m.diedFloor||'?')+'</b> to <b style="color:var(--txt)">'+esc(m.killer||'the Tower')+'</b>'+        (m.kills?' · '+m.kills+' kills':'')+'</div>'+
-        '<div class="pl-epi">"'+esc(m.epitaph||'The Tower keeps what it takes.')+'"</div>'+
-        ((m.returns||0)>0?'<div class="pl-return">🩸 The Tower sent them back '+m.returns+' time'+(m.returns>1?'s':'')+'.</div>':'')+
-        /* V0.4: gear held at death + mourners (fields may be absent on old saves) */
-        (Array.isArray(m.items)&&m.items.length
-          ?'<div class="pl-carry">Carried at the end: '+m.items.map(function(x){return esc((x&&x.name)||'?');}).join(', ')+'</div>'
-          :'')+
-        (Array.isArray(m.mourners)&&m.mourners.length
-          ?'<div class="pl-mourn">Mourned by '+m.mourners.map(function(n){return esc(n);}).join(', ')+'</div>'
-          :'')+
-        '</div>';
-    });
-    html+='</div>';
+  if(!mem.length) return '<p class="hint">Empty. For now.</p>';
+  var html='<div class="memorial-wall">';
+  mem.forEach(function(m,i){
+    html+='<div class="plaque">'+
+      '<div class="pl-ic">'+pxImg(m.cls,m.id,null,{legacy:(m.returns||0)>0})+'</div>'+
+      '<div class="pl-kicker">GEN '+(i+1)+' · Lv.'+(m.lvl||1)+' '+esc(m.cls)+'</div>'+
+      '<div class="pl-name">'+esc(m.name)+'</div>'+
+      '<div class="dead-tag">✝ FALLEN</div>'+
+      '<div style="margin-top:4px">'+starsHtml(m.rarity)+'</div>'+
+      '<div class="pl-sub">Fell on Floor <b>'+(m.diedFloor||'?')+'</b> to <b style="color:var(--txt)">'+esc(m.killer||'the Tower')+'</b>'+        (m.kills?' · '+m.kills+' kills':'')+'</div>'+
+      '<div class="pl-epi">"'+esc(m.epitaph||'The Tower keeps what it takes.')+'"</div>'+
+      ((m.returns||0)>0?'<div class="pl-return">🩸 The Tower sent them back '+m.returns+' time'+(m.returns>1?'s':'')+'.</div>':'')+
+      /* V0.4: gear held at death + mourners (fields may be absent on old saves) */
+      (Array.isArray(m.items)&&m.items.length
+        ?'<div class="pl-carry">Carried at the end: '+m.items.map(function(x){return esc((x&&x.name)||'?');}).join(', ')+'</div>'
+        :'')+
+      (Array.isArray(m.mourners)&&m.mourners.length
+        ?'<div class="pl-mourn">Mourned by '+m.mourners.map(function(n){return esc(n);}).join(', ')+'</div>'
+        :'')+
+      '</div>';
+  });
+  return html+'</div>';
+}
+RENDER.memorial=function(app){
+  app.innerHTML='<h2 class="scr">The Memorial</h2>'+memorialHtml();
+};
+
+/* ======================= V0.32: VILLAGE PLACES =======================
+   Tapping a corner of the hall steps INTO that place: a vignette canvas
+   (scene.placeAttach) + the place's real content below. Screens keep
+   their jobs — the place just gives each one a room. */
+var PLACE_TXT={
+  mem:'Candles for the ones the Tower kept. The grove is quiet; the company remembers.',
+  train:'Drills, footwork, and the sound of wood on wood. Nothing to gain here — nothing lost either. The edge stays an edge.',
+  work:'Whetstones, oil, and armor that will matter tomorrow. The forge is banked but never cold.',
+  rest:'Low fires and dry bedrolls. Wounds close here, nerves settle.'
+};
+RENDER.place=function(app,arg){
+  var place=(arg&&arg.place)||'mem';
+  var s=S(); if(!s){ app.innerHTML='<p class="hint">State not loaded.</p>'; return; }
+  var titles={mem:'The Grove',train:'The Yard',work:'The Workshop',rest:'The Camp'};
+  var html='<h2 class="scr">'+titles[place]+'</h2>'+
+    '<div id="place-canvas"></div>'+
+    '<div class="place-panel"><p class="place-flavor">'+PLACE_TXT[place]+'</p>';
+  if(place==='rest'){
+    var missing=(s.heroes||[]).reduce(function(sum,h){return sum+Math.max(0,h.maxHp-h.hp);},0);
+    html+=missing>0
+      ?'<div class="place-actions"><button class="act gold" id="pl-act">💤 Rest the company</button></div>'
+      :'<p class="hint">No wounds to treat.</p>';
   }
+  if(place==='mem') html+=memorialHtml();
+  if(place==='train'||place==='work') html+='<div class="place-actions"><button class="act" id="pl-back2">Back to the hall</button></div>';
+  html+='<div class="place-actions"><button class="act" id="pl-back">← The hall</button></div>';
+  html+='</div>';
   app.innerHTML=html;
+
+  var holder=UI.el('place-canvas');
+  if(holder&&window.IT&&IT.scene&&typeof IT.scene.placeAttach==='function'){
+    try{ IT.scene.placeAttach(holder,{place:place,party:partyHeroes()}); }catch(e){ /* fallback text below */ }
+    if(!holder.querySelector('canvas')) holder.style.display='none';
+  }
+  var ra=UI.el('pl-act');
+  if(ra) ra.onclick=function(){ doRestAction(); if(CUR==='place') UI.go('place',{place:'rest'}); };
+  var bk=UI.el('pl-back'), bk2=UI.el('pl-back2');
+  if(bk) bk.onclick=function(){ IT.flow.toLobby(); };
+  if(bk2) bk2.onclick=function(){ IT.flow.toLobby(); };
 };
 
 /* ======================= V0.8: expedition scene kit (AGENT-FEEL-C) =======================
