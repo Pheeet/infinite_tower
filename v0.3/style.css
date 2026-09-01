@@ -1560,4 +1560,24 @@ body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .place-actions .act{flex:1;min-height:44px;font-size:9px}
 .place-panel .memorial-wall{margin-top:4px}
 
+/* ---- V0.32c: expedition dialogs POP UP over the scene ---- */
+#app.fixed-page .exp-shell{position:relative}
+#exp-content.pop{
+  position:absolute;left:12px;right:12px;bottom:122px;z-index:6;
+  max-height:56%;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:rgba(11,13,19,.94);
+  border:2px solid #3a4252;
+  box-shadow:4px 4px 0 rgba(0,0,0,.55), inset 0 0 0 1px rgba(232,176,75,.06);
+  padding:10px 12px;
+  animation:expop .26s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes expop{
+  from{opacity:0;transform:translateY(14px) scale(.94)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@media (prefers-reduced-motion: reduce){#exp-content.pop{animation:none}}
+@media (max-height:700px){#exp-content.pop{bottom:104px;max-height:62%}}
+/* the room recedes while a decision is on the table (ignored on old :has-less Safari) */
+.exp-shell:has(#exp-content.pop) #exp-canvas{filter:brightness(.72) saturate(.85)}
+
 /* ==== end V0.9.2 pixel pass ==== */

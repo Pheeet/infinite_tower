@@ -1829,8 +1829,8 @@ function expEnter(node){
   var titleEl=UI.el('exp-title');
   if(titleEl) titleEl.textContent=room.title;
   var content=UI.el('exp-content');
-  if(content) content.innerHTML='<p class="dn-flavor">'+esc(room.flavor)+'</p>'+
-    '<div class="dn-choices"><span class="dn-walking">the party moves up…</span></div>';
+  if(content){ content.className=''; content.innerHTML='<p class="dn-flavor">'+esc(room.flavor)+'</p>'+
+    '<div class="dn-choices"><span class="dn-walking">the party moves up…</span></div>'; }
 
   function proceed(){
     if(window.IT&&IT.scene&&IT.scene.dungeonDetach) IT.scene.dungeonDetach();
@@ -1850,6 +1850,7 @@ function expEnter(node){
   function showChoices(){
     var box=UI.el('exp-content');
     if(!box){ proceed(); return; }
+    box.className='pop';   /* V0.32c: decisions arrive as a popup over the room */
     var btns='<p class="dn-flavor">'+esc(room.flavor)+'</p><div class="dn-choices">';
     if(node.type==='treasure'){
       btns+='<button class="act gold" id="dn-a">💰 Approach the cache</button>'+
@@ -1891,7 +1892,7 @@ function expIdle(){
   var titleEl=UI.el('exp-title');
   if(titleEl) titleEl.textContent='';
   var content=UI.el('exp-content');
-  if(content) content.innerHTML='<p class="dn-idle">The room is quiet now. Choose the next door on the route.</p>';
+  if(content){ content.className=''; content.innerHTML='<p class="dn-idle">The room is quiet now. Choose the next door on the route.</p>'; }
   /* a calm corridor scene behind the words */
   if(window.IT&&IT.scene&&typeof IT.scene.dungeonAttach==='function'){
     try{
@@ -1910,6 +1911,7 @@ function expIdle(){
 function expEvent(node){
   var s=S(); if(!s||!s.expedition) return;
   var content=UI.el('exp-content')||UI.el('app');
+  if(content.id==='exp-content') content.className='pop';
   content.innerHTML='<div class="event-scene">'+
     '<div class="exp-kicker"><span>FLOOR '+s.expedition.floor+'</span><i class="dot"></i><span>SOMETHING HAPPENS</span></div>'+
     '<div id="event-box"></div></div>';
@@ -2678,6 +2680,7 @@ function showTreasure(node,ex){
   var flavor=pick(TREASURE_FLAVOR);
   var memHtml='';
   var app=UI.el('exp-content')||UI.el('app');
+  if(app.id==='exp-content') app.className='pop';
   app.innerHTML='<div class="exp-scene node-scene treasure-scene">'+
     '<div class="exp-kicker"><span>FLOOR '+ex.floor+'</span><i class="dot"></i><span>A CACHE</span></div>'+
     '<div class="node-moment">'+
@@ -2714,6 +2717,7 @@ function showRest(node,ex){
   var sv0=core('save'); if(sv0) sv0.call(IT);
   var names=healed.map(function(h){return esc(h.name);}).join(', ');
   var app=UI.el('exp-content')||UI.el('app');
+  if(app.id==='exp-content') app.className='pop';
   app.innerHTML='<div class="exp-scene node-scene rest-scene">'+
     '<div class="exp-kicker"><span>FLOOR '+ex.floor+'</span><i class="dot"></i><span>A MOMENT&rsquo;S PEACE</span></div>'+
     '<div class="node-moment">'+
@@ -2761,6 +2765,7 @@ function showRemains(node,ex){
   }
 
   var app=UI.el('exp-content')||UI.el('app');
+  if(app.id==='exp-content') app.className='pop';
   app.innerHTML='<div class="exp-scene node-scene remains-scene">'+
     '<div class="exp-kicker"><span>FLOOR '+floor+'</span><i class="dot"></i><span>WHAT REMAINS</span></div>'+
     '<div class="node-moment">'+
